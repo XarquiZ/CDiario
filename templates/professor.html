@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gerenciamento Escolar - Seleção de Turma</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-[#F8FAFF] min-h-screen">
+  <!-- Header com Botão Voltar -->
+  <header class="flex items-center justify-between px-6 py-2.5 border-b border-gray-200 bg-white">
+    <div class="flex items-center gap-4">
+      <button class="flex items-center gap-2 focus:outline-none hover:text-blue-600 transition" onclick="window.location.href='/'">
+        <i class="fas fa-arrow-left text-sm"></i>
+        <span>Voltar</span>
+      </button>
+      <h1 class="font-extrabold text-[#2563EB] text-lg select-none">Seleção de Turma</h1>
+    </div>
+    <div>
+      <img src="/static/logo.png" alt="Logo CEDESP Rede Comunitá" class="h-10 object-contain">
+    </div>
+  </header>
+
+  <!-- Mensagens de Boas-Vindas -->
+  <div class="text-center py-4">
+    <p class="welcome-text mb-1">Bem-vindo ao Painel de Professores</p>
+    <p class="text-gray-600 text-sm">Selecione um turno e uma turma para gerenciar</p>
+  </div>
+
+  <!-- Seletor de Períodos -->
+  <div class="flex justify-center mb-6">
+    <label class="flex items-center gap-2">
+      <span class="text-sm text-[#1E293B] font-medium">Turno:</span>
+      <select id="turno-select" onchange="filterTurmas()" class="border border-gray-300 rounded px-2 py-1 text-sm">
+        <option value="">Selecione um turno</option>
+        <option value="Manhã">Manhã</option>
+        <option value="Tarde">Tarde</option>
+        <option value="Noite">Noite</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- Conteúdo Principal -->
+  <div class="main-container mx-auto mt-6">
+    <div id="turmas-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Turmas serão renderizadas aqui pelo JavaScript -->
+    </div>
+  </div>
+
+  <script src="/static/js/professor.js"></script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gerenciamento Escolar - Gerenciamento de Turma</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/font-awesome.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      box-sizing: border-box;
+    }
+    .nav-tab {
+      min-width: 120px;
+    }
+    nav, #content-area, .main-container, #notas-container, #advertencias-container, #boletins-container, #chamada-container {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+    }
+    nav {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .main-container {
+      padding-left: 5% !important;
+      padding-right: 5% !important;
+      display: flex;
+      flex-direction: column;
+    }
+    #content-area, #notas-container, #advertencias-container, #boletins-container, #chamada-container {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100% !important;
+    }
+    @media (min-width: 768px) {
+      .main-container {
+        flex-direction: column;
+        width: 100%;
+      }
+      #content-area, #notas-container, #advertencias-container, #boletins-container, #chamada-container {
+        width: 100%;
+        max-width: none;
+        margin-right: 0;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFF] min-h-screen">
+  <header class="flex items-center justify-between px-6 py-2.5 border-b border-gray-200 bg-white">
+    <div class="flex items-center gap-4 text-sm text-gray-700 select-none">
+      <button class="flex items-center gap-2 focus:outline-none hover:text-blue-600 transition" onclick="window.location.href='/professor'">
+        <i class="fas fa-arrow-left"></i>
+        <span>Voltar</span>
+      </button>
+      <h1 class="font-extrabold text-[#2563EB] text-lg">Painel de Gerenciamento - {{ turma_nome }}</h1>
+    </div>
+    <div>
+      <img src="/static/logo.png" alt="Logo CEDESP Rede Comunitá" class="h-10 object-contain">
+    </div>
+  </header>
+
+  <div class="w-full mx-auto mt-6 main-container">
+    <nav class="flex border border-gray-200 rounded-md overflow-hidden text-center text-sm font-normal text-gray-900 mb-8 select-none w-full" role="tablist" aria-label="Navegação do painel">
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200 bg-white text-blue-700 font-semibold" role="tab" aria-selected="true" tabindex="0" type="button" onclick="switchTab('alunos')">
+        Gerenciar Alunos
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('chamada')">
+        Chamada
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('advertencias_faltas')">
+        Advertências
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('notas')">
+        Notas
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('notificacoes')">
+        Notificações
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('fichas_individuais')">
+        Fichas Individuais
+      </button>
+      <button class="nav-tab flex-1 py-3" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('boletim')">
+        Boletins
+      </button>
+    </nav>
+
+    <section id="content-area" class="w-full"></section>
+
+    <div id="notas-container" class="hidden"></div>
+    <div id="notificacoes-container" class="hidden"></div>
+    <div id="advertencias-faltas-container" class="hidden"></div>
+    <div id="fichas-individuais-container" class="hidden"></div>
+    <div id="boletins-container" class="hidden"></div>
+    <div id="chamada-container" class="hidden"></div>
+  </div>
+  <script>
+    window.turmaNome = "{{ turma_nome }}";
+    window.turmaTurno = "{{ turno }}";
+  </script>
+
+  <script src="{{ url_for('static', filename='js/turma.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='js/advertencias.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='js/advertencias_faltas.js') }}?v=2"></script>
+  <script src="{{ url_for('static', filename='js/fichas_individuais.js') }}?v=1"></script>
+</body>
+</html>

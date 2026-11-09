@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/font-awesome.min.css">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif !important;
+      box-sizing: border-box !important;
+      background-color: #F8FAFF;
+      color: #1E293B;
+    }
+    #chamada-container {
+      padding: 1rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .calendar-day {
+      transition: background-color 0.3s ease;
+    }
+    .calendar-day.selected {
+      background-color: #2563EB;
+      color: white;
+    }
+    .calendar-day.non-school-day {
+      background-color: #F3F4F6;
+      color: #9CA3AF;
+    }
+    .calendar-day:hover:not(:disabled) {
+      background-color: #E5E7EB;
+    }
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      #calendar-container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="chamada-container" class="hidden">
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Left Calendar -->
+      <section
+        aria-label="Calendário"
+        class="bg-white rounded-lg p-6 shadow-sm max-w-md w-full lg:col-span-4"
+      >
+        <h2 class="font-extrabold text-lg mb-1 text-[#1E1E2D]">Calendário</h2>
+        <p class="text-sm text-[#6B7280] mb-4">
+          Selecione uma data para gerenciar a presença
+        </p>
+        <div
+          id="calendar-container"
+          class="border border-[#E5E7EB] rounded-md p-4 select-none"
+          aria-label="Calendário do mês maio 2025"
+        >
+          <!-- Calendário será preenchido por JavaScript -->
+        </div>
+      </section>
+
+      <!-- Right Chamada -->
+      <section
+        aria-label="Chamada"
+        class="bg-white rounded-lg p-6 shadow-sm w-full lg:col-span-8 flex flex-col"
+      >
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="font-extrabold text-lg text-[#1E1E2D] flex items-center gap-2">
+            <i class="fas fa-list-ul text-base"></i> Chamada
+          </h2>
+          <button
+            type="button"
+            class="bg-[#1E90FF] text-white font-semibold py-2 px-4 rounded-md hover:bg-[#1E70FF]"
+            onclick="window.printChamada()"
+          >
+            <i class="fas fa-print"></i> Imprimir
+          </button>
+        </div>
+        <p id="chamada-date" class="text-sm text-[#6B7280] mb-4"></p>
+
+        <div id="chamada-table" class="overflow-x-auto rounded-md border border-[#E5E7EB]">
+          <!-- Tabela será preenchida por JavaScript -->
+        </div>
+        <p id="chamada-footer" class="text-xs text-[#6B7280] mt-2 text-center"></p>
+        
+        <!-- Botão para navegar para Advertências -->
+        <a href="/advertencias-html" class="mt-4 inline-block bg-[#1E90FF] text-white font-semibold py-2 px-4 rounded-md hover:bg-[#1E70FF] text-center">
+          Ir para Advertências
+        </a>
+      </section>
+    </main>
+
+    <!-- Summary Section -->
+    <section
+      aria-label="Resumo de presença"
+      class="grid grid-cols-3 gap-6 mt-6"
+    >
+      <article
+        id="presentes-card"
+        class="bg-white rounded-lg p-4 shadow-sm flex flex-col justify-between"
+        aria-label="Alunos Presentes"
+      >
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs text-[#6B7280]">Alunos Presentes</p>
+            <p id="presentes-count" class="font-extrabold text-2xl text-[#1E1E2D] leading-none">0</p>
+            <p id="presentes-total" class="text-xs text-[#6B7280]"></p>
+          </div>
+          <i class="fas fa-user-check text-green-600 text-xl mt-1"></i>
+        </div>
+      </article>
+
+      <article
+        id="ausentes-card"
+        class="bg-white rounded-lg p-4 shadow-sm flex flex-col justify-between"
+        aria-label="Alunos Ausentes"
+      >
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs text-[#6B7280]">Alunos Ausentes</p>
+            <p id="ausentes-count" class="font-extrabold text-2xl text-[#1E1E2D] leading-none">0</p>
+            <p id="ausentes-total" class="text-xs text-[#6B7280]"></p>
+          </div>
+          <i class="fas fa-user-times text-red-600 text-xl mt-1"></i>
+        </div>
+      </article>
+
+      <article
+        id="taxa-card"
+        class="bg-white rounded-lg p-4 shadow-sm flex flex-col justify-between"
+        aria-label="Taxa de Presença"
+      >
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs text-[#6B7280]">Taxa de Presença</p>
+            <p id="taxa-value" class="font-extrabold text-2xl text-[#1E1E2D] leading-none">0%</p>
+            <p id="taxa-date" class="text-xs text-[#6B7280]"></p>
+          </div>
+          <i class="fas fa-calendar-alt text-[#2B49E1] text-xl mt-1"></i>
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <script src="/static/js/chamada.js?v=2"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const turmaNome = window.turmaNome || 'Turma Exemplo';
+      const turno = window.turmaTurno || 'Manhã';
+      window.renderChamada(turmaNome, turno);
+    });
+  </script>
+</body>
+</html>

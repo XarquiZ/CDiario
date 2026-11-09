@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/font-awesome.min.css">
+  <style>
+    body, section, aside, div, h2, h3, ul, li, button, p, time {
+      font-family: 'Inter', sans-serif !important;
+      box-sizing: border-box !important;
+    }
+    section {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start; /* Alinha os itens ao topo */
+    }
+    aside {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      width: 280px !important;
+      flex-shrink: 0;
+      max-height: 500px; /* Altura máxima ajustada para evitar que fique muito grande */
+      overflow-y: auto; /* Rolagem vertical apenas para alunos */
+      border-right: 1px solid #e5e7eb; /* Linha divisória */
+    }
+    #notas-section {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: calc(100% - 280px) !important; /* Ajusta a largura restante */
+    }
+    #notas-list {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: 100 !important;
+    }
+    .nova-nota-btn {
+      background-color: #1E90FF !important;
+      color: white !important;
+      border-radius: 0.375rem !important;
+      padding: 0.5rem 1rem !important;
+      font-weight: 600 !important;
+    }
+    .nova-nota-btn:hover {
+      background-color: #1E70FF !important;
+    }
+    .nova-nota-btn:disabled {
+      background-color: #A1A1AA !important;
+      cursor: not-allowed;
+    }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    /* Transição para os botões da lista de alunos */
+    #alunos-list button {
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    /* Estilo para animação de notas e lista de alunos */
+    #notas-list, #alunos-list {
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+    #notas-list.fade-out, #alunos-list.fade-out {
+      opacity: 0;
+    }
+    #notas-list.fade-in, #alunos-list.fade-in {
+      opacity: 1;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    /* Estilos para o modal */
+    #nova-nota-modal {
+      animation: fadeInModal 0.3s ease forwards;
+    }
+    @keyframes fadeInModal {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    /* Estilo para campos opcionais vazios */
+    #notas-list p.text-gray-600 {
+      font-style: italic;
+    }
+    /* Garantir que as barras de progresso usem as cores corretas */
+    .bg-red-500 {
+      background-color: #EF4444 !important; /* Vermelho */
+    }
+    .bg-orange-500 {
+      background-color: #F97316 !important; /* Laranja */
+    }
+    .bg-green-500 {
+      background-color: #22C55E !important; /* Verde */
+    }
+    /* Estilo para o filtro */
+    .filter-select {
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      border: 1px solid #d1d5db;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #1E293B;
+      background-color: white;
+      transition: border-color 0.3s ease;
+    }
+    .filter-select:focus {
+      border-color: #2563EB;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    /* Estilos para as tags de tipo de nota - Backup para o Tailwind */
+    .bg-blue-100 {
+      background-color: #DBEAFE !important; /* Equivalente a bg-blue-100 */
+    }
+    .text-blue-600 {
+      color: #2563EB !important; /* Equivalente a text-blue-600 */
+    }
+    .bg-green-100 {
+      background-color: #DCFCE7 !important; /* Equivalente a bg-green-100 */
+    }
+    .text-green-600 {
+      color: #16A34A !important; /* Equivalente a text-green-600 */
+    }
+    .bg-purple-100 {
+      background-color: #F3E8FF !important; /* Equivalente a bg-purple-100 */
+    }
+    .text-purple-600 {
+      color: #9333EA !important; /* Equivalente a text-purple-600 */
+    }
+    .bg-cyan-100 {
+      background-color: #CFFAFE !important; /* Equivalente a bg-cyan-100 */
+    }
+    .text-cyan-600 {
+      color: #0891B2 !important; /* Equivalente a text-cyan-600 */
+    }
+    .bg-orange-100 {
+      background-color: #FFEDD5 !important; /* Equivalente a bg-orange-100 */
+    }
+    .text-orange-600 {
+      color: #EA580C !important; /* Equivalente a text-orange-600 */
+    }
+    .bg-pink-100 {
+      background-color: #FCE7F3 !important; /* Equivalente a bg-pink-100 */
+    }
+    .text-pink-600 {
+      color: #DB2777 !important; /* Equivalente a text-pink-600 */
+    }
+    .bg-amber-100 {
+      background-color: #FEF3C7 !important; /* Equivalente a bg-amber-100 */
+    }
+    .text-amber-600 {
+      color: #D97706 !important; /* Equivalente a text-amber-600 */
+    }
+    .bg-gray-100 {
+      background-color: #F3F4F6 !important; /* Equivalente a bg-gray-100 */
+    }
+    .text-gray-600 {
+      color: #4B5563 !important; /* Equivalente a text-gray-600 */
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFF] text-[#1E293B]">
+  <div class="title-row">
+    <h2 class="font-extrabold text-[#0F172A] text-xl" id="section-title">Gerenciamento de Notas</h2>
+    <div class="flex items-center gap-2">
+      <select id="nota-filter" class="filter-select" onchange="applyNotaFilter()">
+        <option value="todos">Todos</option>
+        <option value="curso_especifico">Curso Específico</option>
+        <option value="curso_extra">Curso Extra</option>
+        <!-- Opções dinâmicas para cursos extras serão geradas pelo JavaScript -->
+      </select>
+      <button
+        type="button"
+        class="nova-nota-btn inline-flex items-center gap-2 text-sm font-semibold rounded-md px-4 py-2"
+      >
+        <i class="fas fa-plus"></i> Nova Nota
+      </button>
+    </div>
+  </div>
+  <section class="flex flex-col md:flex-row gap-6 w-full">
+    <aside class="flex flex-col gap-4 bg-white rounded-md py-4 px-4 shadow-sm">
+      <h3 class="font-semibold text-base text-[#1E293B] mb-2 sr-only">Alunos</h3>
+      <ul class="flex flex-col gap-3 text-sm" id="alunos-list">
+        <!-- Alunos serão renderizados aqui pelo JavaScript -->
+      </ul>
+    </aside>
+    <div class="flex-1 flex flex-col gap-4" id="notas-section">
+      <h3 class="font-semibold text-[#1E293B] text-lg mb-4" id="aluno-notas-title"></h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full" id="notas-list">
+        <!-- Notas serão renderizados aqui pelo JavaScript -->
+      </div>
+    </div>
+  </section>
+</body>
+</html>

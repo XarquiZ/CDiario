@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fichas Individuais do Atendido</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/font-awesome.min.css">
+  <style>
+    body, section, aside, div, h2, h3, ul, li, button, p, time, table, tr, th, td {
+      font-family: 'Inter', sans-serif !important;
+      box-sizing: border-box !important;
+    }
+    section {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+    }
+    aside {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      width: 280px !important;
+      flex-shrink: 0;
+      max-height: 550px;
+      overflow-y: auto;
+      border-right: 1px solid #e5e7eb;
+    }
+    #fichas-individuais-section {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: calc(100% - 280px) !important;
+    }
+    .print-all-btn {
+      background-color: #1E90FF !important;
+      color: white !important;
+      border-radius: 0.375rem !important;
+      padding: 0.5rem 1rem !important;
+      font-weight: 600 !important;
+    }
+    .print-all-btn:hover {
+      background-color: #1E70FF !important;
+    }
+    .print-all-btn:disabled {
+      background-color: #A1A1AA !important;
+      cursor: not-allowed;
+    }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding: 0;
+    }
+    #alunos-list-fichas button {
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    #ficha-preview, #alunos-list-fichas {
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+    #ficha-preview.fade-out, #alunos-list-fichas.fade-out {
+      opacity: 0;
+    }
+    #ficha-preview.fade-in, #alunos-list-fichas.fade-in {
+      opacity: 1;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Estilos do Preview do Documento Oficial */
+    .documento-folha {
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #000;
+      margin-bottom: 30px;
+    }
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1.5px solid #000;
+      margin-bottom: 12px;
+    }
+    .doc-table th, .doc-table td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      text-align: center;
+      font-size: 11px;
+    }
+    .doc-table th {
+      background-color: #e5e7eb;
+      font-weight: 800;
+    }
+    .doc-header-title {
+      background-color: #e5e7eb;
+      font-weight: 800;
+      text-align: center;
+      padding: 5px;
+      border: 1.5px solid #000;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .doc-footer-legal {
+      font-size: 8.5px;
+      color: #374151;
+      text-align: center;
+      line-height: 1.3;
+      border-top: 1px solid #9ca3af;
+      padding-top: 8px;
+      margin-top: 25px;
+    }
+  </style>
+</head>
+<body class="bg-[#F8FAFF] text-[#1E293B]">
+  <div class="title-row">
+    <div>
+      <h2 class="font-extrabold text-[#0F172A] text-xl" id="section-title">Fichas Individuais do Atendido</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Relatório mensal consolidado com faltas, advertências, notificações e assinaturas.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Seletor de Mês -->
+      <div class="flex items-center gap-1.5 bg-white border border-gray-300 rounded-md px-3 py-1.5 shadow-sm">
+        <label for="mes-filtro" class="text-xs font-semibold text-gray-600">Mês:</label>
+        <select id="mes-filtro" class="text-xs font-bold text-gray-900 bg-transparent outline-none cursor-pointer">
+          <option value="todos">Todos os Meses</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+      </div>
+
+      <button
+        type="button"
+        class="print-all-btn inline-flex items-center gap-2 text-sm font-semibold rounded-md px-4 py-2"
+        id="btn-imprimir-todas-fichas"
+        disabled
+      >
+        <i class="fas fa-file-download"></i> Baixar Todas as Fichas
+      </button>
+      <button
+        type="button"
+        class="bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-2 text-sm font-semibold rounded-md px-4 py-2"
+        id="btn-imprimir-ficha-atual"
+        disabled
+      >
+        <i class="fas fa-print"></i> Imprimir Ficha Deste Aluno
+      </button>
+    </div>
+  </div>
+
+  <div id="fichas-individuais-container">
+    <section class="flex flex-col md:flex-row gap-6 w-full">
+      <aside class="flex flex-col gap-4 bg-white rounded-md py-4 px-4 shadow-sm">
+        <h3 class="font-semibold text-base text-[#1E293B] mb-2 sr-only">Alunos</h3>
+        <ul class="flex flex-col gap-3 text-sm" id="alunos-list-fichas"></ul>
+      </aside>
+
+      <div class="flex-1 flex flex-col gap-4" id="fichas-individuais-section">
+        <div id="ficha-preview" class="w-full">
+          <article class="bg-white rounded-md p-6 shadow-sm text-center">
+            <p class="text-gray-600">Selecione um aluno para visualizar a ficha individual completa.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/js/fichas_individuais.js?v=1"></script>
+</body>
+</html>

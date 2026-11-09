@@ -1,0 +1,1499 @@
+from flask import Flask, jsonify, request, render_template, send_from_directory, Response
+from flask_cors import CORS
+import sqlite3
+import json
+import os
+from pathlib import Path
+import socket
+import sys
+from unidecode import unidecode
+import re
+from datetime import datetime, timedelta
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+import io
+import logging
+import signal
+import threading
+
+# Configuração de logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__, static_url_path='/static', static_folder='static')
+CORS(app, resources={r"/*": {"origins": ["http://localhost:*", "http://127.0.0.1:*"]}})
+
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+DATABASE = str(BASE_DIR / 'database.db')
+
+TIPOS_PERMITIDOS = [
+    'teorica', 'pratica', 'extra_esporte', 'extra_formacao_humana',
+    'extra_iniciacao_digital', 'extra_mercado_trabalho', 'extra_musica',
+    'extra_qualidade_vida'
+]
+
+def normalize_string(text):
+    if not text:
+        return text
+    text = unidecode(text).lower()
+    text = text.replace(' ', '_')
+    return text
+
+def normalize_turno(turno):
+    if not turno:
+        return None
+    return unidecode(turno).lower()
+
+def convert_date_format(date_str):
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        return date_obj.strftime('%d/%m/%Y')
+    except ValueError:
+        try:
+            date_obj = datetime.strptime(date_str, '%d/%m/%Y')
+            return date_str
+        except ValueError:
+            raise ValueError(f"Formato de data inválido: {date_str}. Deve ser AAAA-MM-DD ou DD/MM/AAAA.")
+
+def validate_date_format(date_str):
+    if not date_str:
+        return True
+    try:
+        date_str = convert_date_format(date_str)
+        pattern = r'^\d{2}/\d{2}/\d{4}$'
+        if not re.match(pattern, date_str):
+            return False
+        day, month, year = map(int, date_str.split('/'))
+        if not (1 <= day <= 31):
+            return False
+        if not (1 <= month <= 12):
+            return False
+        if not (1900 <= year <= 9999):
+            return False
+        return True
+    except ValueError:
+        return False
+
+def check_write_permissions():
+    try:
+        if not os.access(BASE_DIR, os.W_OK):
+            raise PermissionError(f"Sem permissão de escrita no diretório: {BASE_DIR}")
+        logger.info(f"Permissões de escrita verificadas com sucesso no diretório: {BASE_DIR}")
+    except PermissionError as e:
+        logger.error(f"Erro de permissão: {e}")
+        raise
+
+def get_db_connection():
+    try:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        logger.info("Conexão com o banco de dados estabelecida com sucesso.")
+        return conn
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao conectar ao banco de dados: {e}")
+        raise
+
+def init_db():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alunos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                data_nascimento TEXT,
+                nis TEXT,
+                rg TEXT,
+                orgao TEXT,
+                uf_rg TEXT,
+                cpf TEXT,
+                sexo TEXT,
+                nacionalidade TEXT,
+                naturalidade TEXT,
+                uf_naturalidade TEXT,
+                nome_pai TEXT,
+                nome_mae TEXT,
+                etnia TEXT,
+                deficiencia TEXT,
+                situacao_ocupacional TEXT,
+                cep TEXT,
+                rua TEXT,
+                numero TEXT,
+                bairro TEXT,
+                municipio TEXT,
+                estado TEXT,
+                telefone TEXT,
+                celular TEXT,
+                email TEXT,
+                escolaridade TEXT,
+                situacao_escolar TEXT,
+                matricula TEXT,
+                turma TEXT,
+                turno TEXT
+            )
+        ''')
+        logger.info("Tabela 'alunos' verificada/criada com sucesso.")
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS turmas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL UNIQUE,
+                turnos TEXT NOT NULL
+            )
+        ''')
+        logger.info("Tabela 'turmas' verificada/criada com sucesso.")
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aluno_nome TEXT NOT NULL,
+                turma TEXT NOT NULL,
+                turno TEXT NOT NULL,
+                materia TEXT NOT NULL,
+                nota REAL NOT NULL,
+                max_nota REAL NOT NULL,
+                tipo TEXT,
+                data TEXT,
+                descricao TEXT
+            )
+        ''')
+        logger.info("Tabela 'notas' verificada/criada com sucesso.")
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS advertencias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aluno_nome TEXT NOT NULL,
+                turma TEXT NOT NULL,
+                turno TEXT NOT NULL,
+                motivo TEXT NOT NULL,
+                gravidade TEXT,
+                pontos INTEGER,
+                data TEXT NOT NULL,
+                descricao TEXT
+            )
+        ''')
+        logger.info("Tabela 'advertencias' verificada/criada com sucesso.")
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS presencas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aluno_nome TEXT NOT NULL,
+                turma TEXT NOT NULL,
+                turno TEXT NOT NULL,
+                data TEXT NOT NULL,
+                presente BOOLEAN NOT NULL,
+                falta BOOLEAN NOT NULL DEFAULT 0,
+                justificado BOOLEAN NOT NULL DEFAULT 0,
+                UNIQUE(aluno_nome, turma, turno, data)
+            )
+        ''')
+        logger.info("Tabela 'presencas' verificada/criada com sucesso.")
+
+        conn.commit()
+        logger.info("Banco de dados inicializado com sucesso. Todas as tabelas verificadas/criadas.")
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao inicializar o banco de dados: {e}")
+        raise
+    finally:
+        conn.close()
+
+def initialize_app():
+    check_write_permissions()
+    if not os.path.exists(DATABASE):
+        logger.info(f"Database não encontrado em {DATABASE}. Criando novo banco de dados.")
+        init_db()
+    else:
+        logger.info(f"Database encontrado em {DATABASE}. Verificando tabelas existentes.")
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [table[0] for table in cursor.fetchall()]
+            required_tables = ['alunos', 'turmas', 'notas', 'advertencias', 'presencas']
+            missing_tables = [table for table in required_tables if table not in tables]
+
+            if missing_tables:
+                logger.info(f"Tabelas ausentes detectadas: {missing_tables}. Recriando banco de dados.")
+                init_db()
+            else:
+                logger.info("Todas as tabelas necessárias estão presentes.")
+            conn.close()
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao verificar tabelas existentes: {e}")
+            raise
+
+def find_free_port(start_port=5000, max_attempts=100):
+    port = start_port
+    for _ in range(max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('0.0.0.0', port))
+                return port
+            except OSError:
+                port += 1
+    raise RuntimeError(f"Não foi possível encontrar uma porta livre entre {start_port} e {start_port + max_attempts - 1}")
+
+def shutdown_server():
+    """Encerra o servidor Flask."""
+    logger.info("Encerrando o servidor...")
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func:
+        func()
+    logger.info("Servidor encerrado.")
+
+# Adiciona endpoint para desligamento
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    logger.info("Recebido comando de desligamento do cliente...")
+    threading.Thread(target=shutdown_server).start()  # Executa em uma thread separada
+    return "Servidor sendo encerrado", 200
+
+# Tratamento de sinal para Ctrl+C
+def signal_handler(sig, frame):
+    logger.info("Recebido sinal de interrupção (Ctrl+C)...")
+    shutdown_server()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+@app.route('/')
+def index():
+    logger.info("Renderizando página inicial: index.html")
+    return render_template('index.html')
+
+@app.route('/painel')
+def painel():
+    logger.info("Renderizando página do painel: painel.html")
+    return render_template('painel.html')
+
+@app.route('/professor')
+def professor():
+    logger.info("Renderizando página de seleção de turmas: professor.html")
+    return render_template('professor.html')
+
+@app.route('/turma/<nome>/<turno>')
+def turma(nome, turno):
+    if not nome or not turno:
+        logger.error("Nome da turma ou turno não especificado na rota /turma/<nome>/<turno>")
+        return jsonify({'error': 'Nome da turma e turno são obrigatórios na URL'}), 400
+    logger.info(f"Renderizando página da turma: turma.html para {nome} ({turno})")
+    return render_template('turma.html', turma_nome=nome, turno=turno)
+
+@app.route('/chamada')
+def chamada():
+    turma_nome = request.args.get('turma')
+    turno = request.args.get('turno')
+    if not turma_nome or not turno:
+        logger.error(f"Parâmetros obrigatórios ausentes em /chamada: turma={turma_nome}, turno={turno}")
+        return jsonify({'error': 'Parâmetros turma e turno são obrigatórios'}), 400
+    logger.info(f"Renderizando página de chamada: chamada.html para {turma_nome} ({turno})")
+    return render_template('chamada.html', turma_nome=turma_nome, turno=turno)
+
+@app.route('/chamada-html')
+def chamada_html():
+    turma_nome = request.args.get('turma')
+    turno = request.args.get('turno')
+    if not turma_nome or not turno:
+        logger.error(f"Parâmetros obrigatórios ausentes em /chamada-html: turma={turma_nome}, turno={turno}")
+        return jsonify({'error': 'Parâmetros turma e turno são obrigatórios'}), 400
+    logger.info(f"Renderizando chamada HTML para {turma_nome} ({turno})")
+    return render_template('chamada.html', turma_nome=turma_nome, turno=turno)
+
+@app.route('/notas-html')
+def notas_html():
+    logger.info("Renderizando página de notas: notas.html")
+    return render_template('notas.html')
+
+@app.route('/advertencias-html')
+def advertencias_html():
+    aluno_nome = request.args.get('aluno')
+    turma = request.args.get('turma')
+    turno = request.args.get('turno')
+    if not aluno_nome or not turma or not turno:
+        logger.error(f"Parâmetros obrigatórios ausentes em /advertencias-html: aluno={aluno_nome}, turma={turma}, turno={turno}")
+        return jsonify({'error': 'Parâmetros aluno, turma e turno são obrigatórios'}), 400
+    logger.info(f"Renderizando página de advertências: advertencias.html para {aluno_nome} ({turma}, {turno})")
+    return render_template('advertencias.html', aluno_nome=aluno_nome, turma=turma, turno=turno)
+
+@app.route('/boletim-html')
+def boletim_html():
+    logger.info("Renderizando página de boletim: boletim.html")
+    return render_template('boletim.html')
+
+@app.route('/boletim.js')
+def boletim_js():
+    logger.info("Servindo arquivo boletim.js")
+    return app.send_static_file('js/boletim.js')
+
+@app.route('/alunos', methods=['GET'])
+def get_alunos():
+    turma_filter = request.args.get('turma')
+    turno_filter = request.args.get('turno')
+    
+    logger.info(f"Recebida requisição GET /alunos com filtros: turma={turma_filter}, turno={turno_filter}")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM alunos')
+        todos_alunos = cursor.fetchall()
+        logger.info(f"Total de alunos no banco: {len(todos_alunos)}")
+        for aluno in todos_alunos:
+            logger.debug(f"Aluno no banco: id={aluno['id']}, nome={aluno['nome']}, turma={aluno['turma']}, turno={aluno['turno']}")
+
+        query = 'SELECT * FROM alunos'
+        params = []
+        conditions = []
+
+        if turma_filter:
+            conditions.append('turma = ?')
+            params.append(turma_filter)
+        if turno_filter:
+            turno_filter_normalized = normalize_turno(turno_filter)
+            conditions.append('lower(turno) = ?')
+            params.append(turno_filter_normalized)
+
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
+
+        logger.debug(f"Query SQL gerada: {query} com parâmetros {params}")
+        cursor.execute(query, params)
+        alunos = cursor.fetchall()
+        
+        for aluno in alunos:
+            logger.debug(f"Aluno encontrado após filtro: nome={aluno['nome']}, turma={aluno['turma']}, turno={aluno['turno']}")
+        
+        conn.close()
+        
+        logger.info(f"Alunos retornados (filtrados por turma={turma_filter}, turno={turno_filter}): {len(alunos)} registros")
+        return jsonify([{
+            'id': aluno['id'],
+            'nome': aluno['nome'],
+            'data_nascimento': aluno['data_nascimento'],
+            'nis': aluno['nis'],
+            'rg': aluno['rg'],
+            'orgao': aluno['orgao'],
+            'uf_rg': aluno['uf_rg'],
+            'cpf': aluno['cpf'],
+            'sexo': aluno['sexo'],
+            'nacionalidade': aluno['nacionalidade'],
+            'naturalidade': aluno['naturalidade'],
+            'uf_naturalidade': aluno['uf_naturalidade'],
+            'nome_pai': aluno['nome_pai'],
+            'nome_mae': aluno['nome_mae'],
+            'etnia': aluno['etnia'],
+            'deficiencia': aluno['deficiencia'],
+            'situacao_ocupacional': aluno['situacao_ocupacional'],
+            'cep': aluno['cep'],
+            'rua': aluno['rua'],
+            'numero': aluno['numero'],
+            'bairro': aluno['bairro'],
+            'municipio': aluno['municipio'],
+            'estado': aluno['estado'],
+            'telefone': aluno['telefone'],
+            'celular': aluno['celular'],
+            'email': aluno['email'],
+            'escolaridade': aluno['escolaridade'],
+            'situacao_escolar': aluno['situacao_escolar'],
+            'matricula': aluno['matricula'],
+            'turma': aluno['turma'],
+            'turno': aluno['turno']
+        } for aluno in alunos]), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar alunos: {e}")
+        return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
+        
+@app.route('/alunos', methods=['POST'])
+def create_aluno():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /alunos: {data}")
+    try:
+        nome = data['nome']
+        data_nascimento = data.get('data_nascimento')
+        telefone = data.get('telefone')
+        nis = data.get('nis')
+        rg = data.get('rg')
+        orgao = data.get('orgao')
+        uf_rg = data.get('uf_rg')
+        cpf = data.get('cpf')
+        sexo = data.get('sexo')
+        nacionalidade = data.get('nacionalidade')
+        naturalidade = data.get('naturalidade')
+        uf_naturalidade = data.get('uf_naturalidade')
+        nome_pai = data.get('nome_pai')
+        nome_mae = data.get('nome_mae')
+        etnia = data.get('etnia')
+        deficiencia = data.get('deficiencia')
+        situacao_ocupacional = data.get('situacao_ocupacional')
+        cep = data.get('cep')
+        rua = data.get('rua')
+        numero = data.get('numero')
+        bairro = data.get('bairro')
+        municipio = data.get('municipio')
+        estado = data.get('estado')
+        celular = data.get('celular')
+        email = data.get('email')
+        escolaridade = data.get('escolaridade')
+        situacao_escolar = data.get('situacao_escolar')
+        matricula = data.get('matricula')
+        turma = data.get('turma')
+        turno = data.get('turno')
+    except KeyError as e:
+        logger.error(f"Erro ao criar aluno: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    if not nome:
+        logger.error("Erro ao criar aluno: Nome é obrigatório.")
+        return jsonify({'error': 'Nome é obrigatório'}), 400
+
+    if data_nascimento and not validate_date_format(data_nascimento):
+        logger.error(f"Erro ao criar aluno: Data de Nascimento inválida - {data_nascimento}.")
+        return jsonify({'error': 'Data de Nascimento inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+    try:
+        if data_nascimento:
+            data_nascimento = convert_date_format(data_nascimento)
+        if turno:
+            turno = normalize_turno(turno)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO alunos (nome, data_nascimento, nis, rg, orgao, uf_rg, cpf, sexo, nacionalidade, naturalidade, uf_naturalidade, nome_pai, nome_mae, etnia, deficiencia, situacao_ocupacional, cep, rua, numero, bairro, municipio, estado, telefone, celular, email, escolaridade, situacao_escolar, matricula, turma, turno) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (nome, data_nascimento if data_nascimento else None, nis if nis else None, rg if rg else None, orgao if orgao else None, uf_rg if uf_rg else None, cpf if cpf else None, sexo if sexo else None, nacionalidade if nacionalidade else None, naturalidade if naturalidade else None, uf_naturalidade if uf_naturalidade else None, nome_pai if nome_pai else None, nome_mae if nome_mae else None, etnia if etnia else None, deficiencia if deficiencia else None, situacao_ocupacional if situacao_ocupacional else None, cep if cep else None, rua if rua else None, numero if numero else None, bairro if bairro else None, municipio if municipio else None, estado if estado else None, telefone if telefone else None, celular if celular else None, email if email else None, escolaridade if escolaridade else None, situacao_escolar if situacao_escolar else None, matricula if matricula else None, turma if turma else None, turno if turno else None)
+        )
+        conn.commit()
+        aluno_id = cursor.lastrowid
+        logger.info(f"Aluno criado com ID {aluno_id} e salvo no banco de dados.")
+        conn.close()
+        return jsonify({
+            'id': aluno_id,
+            'nome': nome,
+            'data_nascimento': data_nascimento,
+            'nis': nis,
+            'rg': rg,
+            'orgao': orgao,
+            'uf_rg': uf_rg,
+            'cpf': cpf,
+            'sexo': sexo,
+            'nacionalidade': nacionalidade,
+            'naturalidade': naturalidade,
+            'uf_naturalidade': uf_naturalidade,
+            'nome_pai': nome_pai,
+            'nome_mae': nome_mae,
+            'etnia': etnia,
+            'deficiencia': deficiencia,
+            'situacao_ocupacional': situacao_ocupacional,
+            'cep': cep,
+            'rua': rua,
+            'numero': numero,
+            'bairro': bairro,
+            'municipio': municipio,
+            'estado': estado,
+            'telefone': telefone,
+            'celular': celular,
+            'email': email,
+            'escolaridade': escolaridade,
+            'situacao_escolar': situacao_escolar,
+            'matricula': matricula,
+            'turma': turma,
+            'turno': turno
+        }), 201
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao criar aluno no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao inserir no banco de dados: {str(e)}'}), 500
+
+@app.route('/alunos/<int:id>', methods=['PUT'])
+def update_aluno(id):
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição PUT /alunos/{id}: {data}")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM alunos WHERE id = ?', (id,))
+        aluno = cursor.fetchone()
+        if not aluno:
+            conn.close()
+            logger.warning(f"Aluno com ID {id} não encontrado.")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+
+        aluno_atual = dict(aluno)
+
+        nome = data.get('nome', aluno_atual['nome'])
+        data_nascimento = data.get('data_nascimento', aluno_atual['data_nascimento'])
+        telefone = data.get('telefone', aluno_atual['telefone'])
+        nis = data.get('nis', aluno_atual['nis'])
+        rg = data.get('rg', aluno_atual['rg'])
+        orgao = data.get('orgao', aluno_atual['orgao'])
+        uf_rg = data.get('uf_rg', aluno_atual['uf_rg'])
+        cpf = data.get('cpf', aluno_atual['cpf'])
+        sexo = data.get('sexo', aluno_atual['sexo'])
+        nacionalidade = data.get('nacionalidade', aluno_atual['nacionalidade'])
+        naturalidade = data.get('naturalidade', aluno_atual['naturalidade'])
+        uf_naturalidade = data.get('uf_naturalidade', aluno_atual['uf_naturalidade'])
+        nome_pai = data.get('nome_pai', aluno_atual['nome_pai'])
+        nome_mae = data.get('nome_mae', aluno_atual['nome_mae'])
+        etnia = data.get('etnia', aluno_atual['etnia'])
+        deficiencia = data.get('deficiencia', aluno_atual['deficiencia'])
+        situacao_ocupacional = data.get('situacao_ocupacional', aluno_atual['situacao_ocupacional'])
+        cep = data.get('cep', aluno_atual['cep'])
+        rua = data.get('rua', aluno_atual['rua'])
+        numero = data.get('numero', aluno_atual['numero'])
+        bairro = data.get('bairro', aluno_atual['bairro'])
+        municipio = data.get('municipio', aluno_atual['municipio'])
+        estado = data.get('estado', aluno_atual['estado'])
+        celular = data.get('celular', aluno_atual['celular'])
+        email = data.get('email', aluno_atual['email'])
+        escolaridade = data.get('escolaridade', aluno_atual['escolaridade'])
+        situacao_escolar = data.get('situacao_escolar', aluno_atual['situacao_escolar'])
+        matricula = data.get('matricula', aluno_atual['matricula'])
+        turma = data.get('turma', aluno_atual['turma'])
+        turno = data.get('turno', aluno_atual['turno'])
+
+        if not nome:
+            logger.error("Erro ao atualizar aluno: Nome é obrigatório.")
+            conn.close()
+            return jsonify({'error': 'Nome é obrigatório'}), 400
+
+        if data_nascimento and not validate_date_format(data_nascimento):
+            logger.error(f"Erro ao atualizar aluno: Data de Nascimento inválida - {data_nascimento}.")
+            conn.close()
+            return jsonify({'error': 'Data de Nascimento inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        if data_nascimento:
+            data_nascimento = convert_date_format(data_nascimento)
+        if turno:
+            turno = normalize_turno(turno)
+
+        cursor.execute(
+            'UPDATE alunos SET nome = ?, data_nascimento = ?, nis = ?, rg = ?, orgao = ?, uf_rg = ?, cpf = ?, sexo = ?, nacionalidade = ?, naturalidade = ?, uf_naturalidade = ?, nome_pai = ?, nome_mae = ?, etnia = ?, deficiencia = ?, situacao_ocupacional = ?, cep = ?, rua = ?, numero = ?, bairro = ?, municipio = ?, estado = ?, telefone = ?, celular = ?, email = ?, escolaridade = ?, situacao_escolar = ?, matricula = ?, turma = ?, turno = ? WHERE id = ?',
+            (nome, data_nascimento if data_nascimento else None, nis if nis else None, rg if rg else None, orgao if orgao else None, uf_rg if uf_rg else None, cpf if cpf else None, sexo if sexo else None, nacionalidade if nacionalidade else None, naturalidade if naturalidade else None, uf_naturalidade if uf_naturalidade else None, nome_pai if nome_pai else None, nome_mae if nome_mae else None, etnia if etnia else None, deficiencia if deficiencia else None, situacao_ocupacional if situacao_ocupacional else None, cep if cep else None, rua if rua else None, numero if numero else None, bairro if bairro else None, municipio if municipio else None, estado if estado else None, telefone if telefone else None, celular if celular else None, email if email else None, escolaridade if escolaridade else None, situacao_escolar if situacao_escolar else None, matricula if matricula else None, turma if turma else None, turno if turno else None, id)
+        )
+        conn.commit()
+        logger.info(f"Aluno com ID {id} atualizado com sucesso no banco de dados.")
+        conn.close()
+        return jsonify({
+            'id': id,
+            'nome': nome,
+            'data_nascimento': data_nascimento,
+            'nis': nis,
+            'rg': rg,
+            'orgao': orgao,
+            'uf_rg': uf_rg,
+            'cpf': cpf,
+            'sexo': sexo,
+            'nacionalidade': nacionalidade,
+            'naturalidade': naturalidade,
+            'uf_naturalidade': uf_naturalidade,
+            'nome_pai': nome_pai,
+            'nome_mae': nome_mae,
+            'etnia': etnia,
+            'deficiencia': deficiencia,
+            'situacao_ocupacional': situacao_ocupacional,
+            'cep': cep,
+            'rua': rua,
+            'numero': numero,
+            'bairro': bairro,
+            'municipio': municipio,
+            'estado': estado,
+            'telefone': telefone,
+            'celular': celular,
+            'email': email,
+            'escolaridade': escolaridade,
+            'situacao_escolar': situacao_escolar,
+            'matricula': matricula,
+            'turma': turma,
+            'turno': turno
+        }), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao atualizar aluno: {e}")
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alunos/<int:id>', methods=['DELETE'])
+def delete_aluno(id):
+    logger.info(f"Recebida requisição DELETE para aluno com ID {id}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM alunos WHERE id = ?', (id,))
+        aluno = cursor.fetchone()
+        if not aluno:
+            logger.warning(f"Aluno com ID {id} não encontrado.")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+
+        cursor.execute('DELETE FROM presencas WHERE aluno_nome = ? AND turma = ? AND turno = ?', (aluno['nome'], aluno['turma'], aluno['turno']))
+        cursor.execute('DELETE FROM alunos WHERE id = ?', (id,))
+        conn.commit()
+        logger.info(f"Aluno com ID {id} excluído com sucesso do banco de dados.")
+        conn.close()
+        return jsonify({'message': 'Aluno excluído com sucesso'}), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao excluir aluno: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/turmas', methods=['POST'])
+def create_turma():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /turmas: {data}")
+    try:
+        nome = data['nome']
+        turnos = data['turnos']
+        normalized_turnos = [normalize_turno(turno) for turno in turnos if turno]
+    except KeyError as e:
+        logger.error(f"Erro ao criar turma: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM turmas WHERE nome = ?', (nome,))
+        if cursor.fetchone():
+            logger.warning(f"Turma com nome '{nome}' já existe.")
+            return jsonify({'error': 'Turma com esse nome já existe'}), 400
+
+        cursor.execute(
+            'INSERT INTO turmas (nome, turnos) VALUES (?, ?)',
+            (nome, json.dumps(normalized_turnos))
+        )
+        conn.commit()
+        turma_id = cursor.lastrowid
+        logger.info(f"Turma criada com ID {turma_id} e salva no banco de dados.")
+        conn.close()
+        return jsonify({'id': turma_id, 'nome': nome, 'turnos': normalized_turnos}), 201
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao criar turma: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/turmas/<int:id>', methods=['PUT'])
+def update_turma(id):
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição PUT /turmas/{id}: {data}")
+    try:
+        nome = data['nome']
+        turnos = data['turnos']
+        normalized_turnos = [normalize_turno(turno) for turno in turnos if turno]
+    except KeyError as e:
+        logger.error(f"Erro ao atualizar turma: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM turmas WHERE id = ?', (id,))
+        turma = cursor.fetchone()
+        if not turma:
+            logger.warning(f"Turma com ID {id} não encontrada.")
+            return jsonify({'error': 'Turma não encontrada'}), 404
+
+        cursor.execute('SELECT id FROM turmas WHERE nome = ? AND id != ?', (nome, id))
+        if cursor.fetchone():
+            logger.warning(f"Turma com nome '{nome}' já existe.")
+            return jsonify({'error': 'Turma com esse nome já existe'}), 400
+
+        cursor.execute(
+            'UPDATE turmas SET nome = ?, turnos = ? WHERE id = ?',
+            (nome, json.dumps(normalized_turnos), id)
+        )
+        conn.commit()
+        logger.info(f"Turma com ID {id} atualizada com sucesso no banco de dados.")
+        conn.close()
+        return jsonify({'id': id, 'nome': nome, 'turnos': normalized_turnos}), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao atualizar turma: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/turmas/<int:id>', methods=['DELETE'])
+def delete_turma(id):
+    logger.info(f"Recebida requisição DELETE para turma com ID {id}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM turmas WHERE id = ?', (id,))
+        turma = cursor.fetchone()
+        if not turma:
+            logger.warning(f"Turma com ID {id} não encontrada.")
+            return jsonify({'error': 'Turma não encontrada'}), 404
+
+        cursor.execute(
+            'UPDATE alunos SET turma = ?, turno = ? WHERE turma = ?',
+            (None, None, turma['nome'])
+        )
+        cursor.execute('DELETE FROM presencas WHERE turma = ?', (turma['nome'],))
+        cursor.execute('DELETE FROM turmas WHERE id = ?', (id,))
+        conn.commit()
+        logger.info(f"Turma com ID {id} excluída com sucesso do banco de dados.")
+        conn.close()
+        return jsonify({'message': 'Turma excluída com sucesso e alunos associados atualizados'}), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao excluir turma ou atualizar alunos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/turmas', methods=['GET'])
+def get_turmas():
+    turno_filter = request.args.get('turno')
+    logger.info(f"Recebida requisição GET /turmas com filtro: turno={turno_filter}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        logger.debug("Executando consulta SELECT * FROM turmas")
+        cursor.execute('SELECT * FROM turmas')
+        turmas = cursor.fetchall()
+        conn.close()
+        logger.info(f"Turmas retornadas do banco: {len(turmas)} registros")
+        result = []
+        for turma in turmas:
+            try:
+                turnos = json.loads(turma['turnos'])
+                if not isinstance(turnos, list):
+                    logger.error(f"Formato inválido de turnos para turma {turma['nome']}: {turma['turnos']}")
+                    turnos = []
+            except json.JSONDecodeError as e:
+                logger.error(f"Erro ao decodificar JSON de turnos para turma {turma['nome']}: {e}")
+                turnos = []
+            if turno_filter:
+                turno_filter_normalized = normalize_turno(turno_filter)
+                if turno_filter_normalized not in turnos:
+                    continue
+            result.append({
+                'id': turma['id'],
+                'nome': turma['nome'],
+                'turnos': turnos
+            })
+        logger.debug(f"Turmas filtradas e formatadas: {result}")
+        return jsonify(result), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar turmas: {e}")
+        return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Erro inesperado ao buscar turmas: {e}")
+        return jsonify({'error': f'Erro inesperado: {str(e)}'}), 500
+
+@app.route('/notas', methods=['GET'])
+def get_notas():
+    aluno_nome = request.args.get('aluno')
+    turma = request.args.get('turma')
+    turno = request.args.get('turno')
+    if not aluno_nome or not turma or not turno:
+        logger.error(f"Parâmetros obrigatórios ausentes em /notas: aluno={aluno_nome}, turma={turma}, turno={turno}")
+        return jsonify({'error': 'Parâmetros aluno, turma e turno são obrigatórios'}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM notas WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ?', (aluno_nome, turma, turno_normalized))
+        notas = cursor.fetchall()
+        conn.close()
+        logger.info(f"Notas retornadas para {aluno_nome} ({turma}, {turno_normalized}): {len(notas)} registros")
+        normalized_notas = []
+        for nota in notas:
+            tipo = nota['tipo']
+            if tipo:
+                tipo = normalize_string(tipo)
+            else:
+                tipo = 'teorica'
+            normalized_notas.append({
+                'id': nota['id'],
+                'aluno_nome': nota['aluno_nome'],
+                'turma': nota['turma'],
+                'turno': nota['turno'],
+                'materia': nota['materia'],
+                'nota': nota['nota'],
+                'max_nota': nota['max_nota'],
+                'tipo': tipo,
+                'data': nota['data'],
+                'descricao': nota['descricao']
+            })
+        return jsonify(normalized_notas), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar notas: {e}")
+        return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
+
+@app.route('/notas', methods=['POST'])
+def create_nota():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /notas: {data}")
+    try:
+        aluno_nome = data['aluno_nome']
+        turma = data['turma']
+        turno = data['turno']
+        materia = data['materia']
+        nota = float(data['nota'])
+        max_nota = float(data['max_nota'])
+        tipo = data.get('tipo', 'teorica')
+        data_nota = data.get('data')
+        descricao = data.get('descricao', '')
+    except KeyError as e:
+        logger.error(f"Erro ao criar nota: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+    except ValueError as e:
+        logger.error(f"Erro ao criar nota: Valor inválido para nota ou max_nota - {e}")
+        return jsonify({'error': 'Nota e max_nota devem ser números válidos'}), 400
+
+    required_fields = ['aluno_nome', 'turma', 'turno', 'materia', 'nota', 'max_nota']
+    for field in required_fields:
+        if data.get(field) is None:
+            logger.error(f"Erro ao criar nota: Campo {field} é obrigatório.")
+            return jsonify({'error': f'Campo {field} é obrigatório'}), 400
+
+    if tipo not in TIPOS_PERMITIDOS:
+        logger.error(f"Erro ao criar nota: Tipo inválido - {tipo}")
+        return jsonify({'error': f"Tipo deve ser um dos seguintes: {', '.join(TIPOS_PERMITIDOS)}"}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO notas (aluno_nome, turma, turno, materia, nota, max_nota, tipo, data, descricao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (aluno_nome, turma, turno_normalized, materia, nota, max_nota, tipo, data_nota if data_nota else None, descricao if descricao else None)
+        )
+        conn.commit()
+        nota_id = cursor.lastrowid
+        logger.info(f"Nota criada com ID {nota_id} e salva no banco de dados.")
+        conn.close()
+        return jsonify({
+            'id': nota_id,
+            'aluno_nome': aluno_nome,
+            'turma': turma,
+            'turno': turno_normalized,
+            'materia': materia,
+            'nota': nota,
+            'max_nota': max_nota,
+            'tipo': tipo,
+            'data': data_nota,
+            'descricao': descricao
+        }), 201
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao criar nota no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao inserir no banco de dados: {str(e)}'}), 500
+
+@app.route('/notas/<int:nota_id>', methods=['PUT'])
+def update_nota(nota_id):
+    data = request.get_json()
+    if not data:
+        logger.error("Dados não fornecidos para atualização de nota")
+        return jsonify({'error': 'Dados não fornecidos'}), 400
+
+    try:
+        aluno_nome = data.get('aluno_nome')
+        turma = data.get('turma')
+        turno = data.get('turno')
+        materia = data.get('materia')
+        nota = float(data.get('nota'))
+        max_nota = float(data.get('max_nota', 10.0))
+        tipo = data.get('tipo', 'teorica')
+        data_nota = data.get('data')
+        descricao = data.get('descricao', '')
+    except ValueError as e:
+        logger.error(f"Erro ao atualizar nota: Valor inválido para nota ou max_nota - {e}")
+        return jsonify({'error': 'Nota e max_nota devem ser números válidos'}), 400
+
+    if not all([aluno_nome, turma, turno, materia, nota is not None]):
+        logger.error("Campos obrigatórios ausentes para atualização de nota")
+        return jsonify({'error': 'Campos obrigatórios ausentes'}), 400
+
+    if tipo not in TIPOS_PERMITIDOS:
+        logger.error(f"Erro ao atualizar nota: Tipo inválido - {tipo}")
+        return jsonify({'error': f"Tipo deve ser um dos seguintes: {', '.join(TIPOS_PERMITIDOS)}"}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM notas WHERE id = ?', (nota_id,))
+        existing_nota = cursor.fetchone()
+        if not existing_nota:
+            conn.close()
+            logger.warning(f"Nota com ID {nota_id} não encontrada.")
+            return jsonify({'error': 'Nota não encontrada'}), 404
+
+        cursor.execute('''
+            UPDATE notas
+            SET aluno_nome = ?, turma = ?, turno = ?, materia = ?, nota = ?, max_nota = ?, tipo = ?, data = ?, descricao = ?
+            WHERE id = ?
+        ''', (aluno_nome, turma, turno_normalized, materia, nota, max_nota, tipo, data_nota if data_nota else None, descricao if descricao else None, nota_id))
+
+        conn.commit()
+        logger.info(f"Nota com ID {nota_id} atualizada com sucesso.")
+        conn.close()
+        return jsonify({
+            'message': 'Nota atualizada com sucesso',
+            'id': nota_id,
+            'aluno_nome': aluno_nome,
+            'turma': turma,
+            'turno': turno_normalized,
+            'materia': materia,
+            'nota': nota,
+            'max_nota': max_nota,
+            'tipo': tipo,
+            'data': data_nota,
+            'descricao': descricao
+        }), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao atualizar nota: {e}")
+        return jsonify({'error': f'Erro ao atualizar nota: {str(e)}'}), 500
+
+@app.route('/notas/<int:nota_id>', methods=['DELETE'])
+def delete_nota(nota_id):
+    logger.info(f"Recebida requisição DELETE para nota com ID {nota_id}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM notas WHERE id = ?', (nota_id,))
+        existing_nota = cursor.fetchone()
+        if not existing_nota:
+            conn.close()
+            logger.warning(f"Nota com ID {nota_id} não encontrada.")
+            return jsonify({'error': 'Nota não encontrada'}), 404
+
+        cursor.execute('DELETE FROM notas WHERE id = ?', (nota_id,))
+        conn.commit()
+        logger.info(f"Nota com ID {nota_id} excluída com sucesso.")
+        conn.close()
+        return jsonify({'message': 'Nota excluída com sucesso', 'id': nota_id}), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao excluir nota: {e}")
+        return jsonify({'error': f'Erro ao excluir nota: {str(e)}'}), 500
+
+@app.route('/advertencias', methods=['GET'])
+def get_advertencias():
+    aluno_nome = request.args.get('aluno')
+    turma = request.args.get('turma')
+    turno = request.args.get('turno')
+    if not aluno_nome or not turma or not turno:
+        logger.error(f"Parâmetros obrigatórios ausentes em /advertencias: aluno={aluno_nome}, turma={turma}, turno={turno}")
+        return jsonify({'error': 'Parâmetros aluno, turma e turno são obrigatórios'}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM advertencias WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ?', (aluno_nome, turma, turno_normalized))
+        advertencias = cursor.fetchall()
+        conn.close()
+        logger.info(f"Advertências retornadas para {aluno_nome} ({turma}, {turno_normalized}): {len(advertencias)} registros")
+        return jsonify([{
+            'id': adv['id'],
+            'aluno_nome': adv['aluno_nome'],
+            'turma': adv['turma'],
+            'turno': adv['turno'],
+            'motivo': adv['motivo'],
+            'gravidade': adv['gravidade'],
+            'pontos': adv['pontos'],
+            'data': adv['data'],
+            'descricao': adv['descricao']
+        } for adv in advertencias]), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar advertências: {e}")
+        return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
+
+@app.route('/advertencias', methods=['POST'])
+def create_advertencia():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /advertencias: {data}")
+    try:
+        aluno_nome = data['aluno_nome']
+        turma = data['turma']
+        turno = data['turno']
+        motivo = data['motivo']
+        gravidade = data.get('gravidade', 'Leve')
+        pontos = data.get('pontos', 3)
+        data_adv = data.get('data')
+        descricao = data.get('descricao', '')
+    except KeyError as e:
+        logger.error(f"Erro ao criar advertência: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    required_fields = ['aluno_nome', 'turma', 'turno', 'motivo', 'data']
+    for field in required_fields:
+        if data.get(field) is None:
+            logger.error(f"Erro ao criar advertência: Campo {field} é obrigatório.")
+            return jsonify({'error': f'Campo {field} é obrigatório'}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO advertencias (aluno_nome, turma, turno, motivo, gravidade, pontos, data, descricao) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (aluno_nome, turma, turno_normalized, motivo, gravidade, pontos, data_adv, descricao if descricao else None)
+        )
+        conn.commit()
+        advertencia_id = cursor.lastrowid
+        logger.info(f"Advertência criada com ID {advertencia_id} e salva no banco de dados.")
+        conn.close()
+        return jsonify({
+            'id': advertencia_id,
+            'aluno_nome': aluno_nome,
+            'turma': turma,
+            'turno': turno_normalized,
+            'motivo': motivo,
+            'gravidade': gravidade,
+            'pontos': pontos,
+            'data': data_adv,
+            'descricao': descricao
+        }), 201
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao criar advertência no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao inserir no banco de dados: {str(e)}'}), 500
+
+@app.route('/advertencias/<int:advertencia_id>', methods=['PUT'])
+def update_advertencia(advertencia_id):
+    data = request.get_json()
+    if not data:
+        logger.error("Dados não fornecidos para atualização de advertência")
+        return jsonify({'error': 'Dados não fornecidos'}), 400
+
+    aluno_nome = data.get('aluno_nome')
+    turma = data.get('turma')
+    turno = data.get('turno')
+    motivo = data.get('motivo')
+    gravidade = data.get('gravidade', 'Leve')
+    pontos = data.get('pontos', 3)
+    data_adv = data.get('data')
+    descricao = data.get('descricao', '')
+
+    if not all([aluno_nome, turma, turno, motivo, data_adv]):
+        logger.error("Campos obrigatórios ausentes para atualização de advertência")
+        return jsonify({'error': 'Campos obrigatórios ausentes'}), 400
+
+    turno_normalized = normalize_turno(turno)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM advertencias WHERE id = ?', (advertencia_id,))
+        existing_adv = cursor.fetchone()
+        if not existing_adv:
+            conn.close()
+            logger.warning(f"Advertência com ID {advertencia_id} não encontrada.")
+            return jsonify({'error': 'Advertência não encontrada'}), 404
+
+        cursor.execute('''
+            UPDATE advertencias
+            SET aluno_nome = ?, turma = ?, turno = ?, motivo = ?, gravidade = ?, pontos = ?, data = ?, descricao = ?
+            WHERE id = ?
+        ''', (aluno_nome, turma, turno_normalized, motivo, gravidade, pontos, data_adv, descricao if descricao else None, advertencia_id))
+
+        conn.commit()
+        logger.info(f"Advertência com ID {advertencia_id} atualizada com sucesso.")
+        conn.close()
+        return jsonify({
+            'message': 'Advertência atualizada com sucesso',
+            'id': advertencia_id,
+            'aluno_nome': aluno_nome,
+            'turma': turma,
+            'turno': turno_normalized,
+            'motivo': motivo,
+            'gravidade': gravidade,
+            'pontos': pontos,
+            'data': data_adv,
+            'descricao': descricao
+        }), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao atualizar advertência: {e}")
+        return jsonify({'error': f'Erro ao atualizar advertência: {str(e)}'}), 500
+
+@app.route('/advertencias/<int:advertencia_id>', methods=['DELETE'])
+def delete_advertencia(advertencia_id):
+    logger.info(f"Recebida requisição DELETE para advertência com ID {advertencia_id}")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM advertencias WHERE id = ?', (advertencia_id,))
+        existing_adv = cursor.fetchone()
+        if not existing_adv:
+            conn.close()
+            logger.warning(f"Advertência com ID {advertencia_id} não encontrada.")
+            return jsonify({'error': 'Advertência não encontrada'}), 404
+
+        cursor.execute('DELETE FROM advertencias WHERE id = ?', (advertencia_id,))
+        conn.commit()
+        logger.info(f"Advertência com ID {advertencia_id} excluída com sucesso.")
+        conn.close()
+        return jsonify({'message': 'Advertência excluída com sucesso', 'id': advertencia_id}), 200
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao excluir advertência: {e}")
+        return jsonify({'error': f'Erro ao excluir advertência: {str(e)}'}), 500
+
+@app.route('/presenca', methods=['GET'])
+def get_presenca():
+    turma = request.args.get('turma')
+    turno = request.args.get('turno')
+    data = request.args.get('data')
+    if not turma or not turno or not data:
+        logger.error(f"Parâmetros obrigatórios ausentes em /presenca: turma={turma}, turno={turno}, data={data}")
+        return jsonify({'error': 'Parâmetros turma, turno e data são obrigatórios'}), 400
+
+    try:
+        data = convert_date_format(data)
+        if not validate_date_format(data):
+            logger.error("Data inválida fornecida")
+            return jsonify({'error': 'Data inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        data_banco = datetime.strptime(data, '%d/%m/%Y').strftime('%d/%m/%Y')
+        turno_normalized = normalize_turno(turno)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, nome FROM alunos WHERE turma = ? AND lower(turno) = ?', (turma, turno_normalized))
+        alunos = cursor.fetchall()
+
+        cursor.execute('SELECT * FROM presencas WHERE turma = ? AND lower(turno) = ? AND data = ?', (turma, turno_normalized, data_banco))
+        presencas = cursor.fetchall()
+
+        presenca_map = {presenca['aluno_nome']: presenca for presenca in presencas}
+        result = []
+        for aluno in alunos:
+            aluno_nome = aluno['nome']
+            presenca = presenca_map.get(aluno_nome, {})
+            status = 'presente' if presenca.get('presente', False) else \
+                     ('justificado' if presenca.get('justificado', False) else \
+                      ('falta' if presenca.get('falta', False) else ''))
+            result.append({
+                'aluno_id': aluno['id'],
+                'nome': aluno_nome,
+                'status': status
+            })
+
+        conn.close()
+        logger.info(f"Presenças retornadas para turma {turma} e turno {turno_normalized} em {data}: {len(result)} registros")
+        return jsonify(result), 200
+    except ValueError as e:
+        logger.error(f"Erro ao buscar presenças: Data inválida - {e}")
+        return jsonify({'error': str(e)}), 400
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar presenças: {e}")
+        return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
+
+@app.route('/presenca', methods=['POST'])
+def update_presenca():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /presenca: {data}")
+
+    try:
+        aluno_id = data['aluno_id']
+        turma = data['turma']
+        turno = data['turno']
+        data_presenca = data['data']
+        status = data['status']
+    except KeyError as e:
+        logger.error(f"Erro ao atualizar presença: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    if status not in ['presente', 'falta', 'justificado']:
+        logger.error(f"Erro ao atualizar presença: Status inválido - {status}")
+        return jsonify({'error': 'Status deve ser "presente", "falta" ou "justificado"'}), 400
+
+    try:
+        data_presenca = convert_date_format(data_presenca)
+        if not validate_date_format(data_presenca):
+            logger.error("Data inválida fornecida")
+            return jsonify({'error': 'Data inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        data_banco = datetime.strptime(data_presenca, '%d/%m/%Y').strftime('%d/%m/%Y')
+        turno_normalized = normalize_turno(turno)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nome FROM alunos WHERE id = ?', (aluno_id,))
+        aluno = cursor.fetchone()
+        if not aluno:
+            conn.close()
+            logger.warning(f"Aluno com ID {aluno_id} não encontrado.")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+        aluno_nome = aluno['nome']
+
+        presente = status == 'presente'
+        falta = status == 'falta'
+        justificado = status == 'justificado'
+
+        if falta and not justificado:
+            justificado = False
+        elif justificado:
+            falta = True
+
+        cursor.execute('SELECT * FROM presencas WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?', (aluno_nome, turma, turno_normalized, data_banco))
+        existing_presenca = cursor.fetchone()
+
+        if existing_presenca:
+            try:
+                cursor.execute(
+                    'UPDATE presencas SET presente = ?, falta = ?, justificado = ? WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?',
+                    (presente, falta, justificado, aluno_nome, turma, turno_normalized, data_banco)
+                )
+                conn.commit()
+                logger.info(f"Presença atualizada para {aluno_nome} ({turma}, {turno_normalized}) em {data_presenca}: presente={presente}, falta={falta}, justificado={justificado}")
+            except sqlite3.IntegrityError as e:
+                logger.error(f"Conflito de chave única ao atualizar presença: {e}")
+                return jsonify({'error': 'Conflito de dados. Tente novamente ou verifique a integridade do banco.'}), 409
+        else:
+            try:
+                cursor.execute(
+                    'INSERT INTO presencas (aluno_nome, turma, turno, data, presente, falta, justificado) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    (aluno_nome, turma, turno_normalized, data_banco, presente, falta, justificado)
+                )
+                conn.commit()
+                logger.info(f"Presença criada para {aluno_nome} ({turma}, {turno_normalized}) em {data_presenca}: presente={presente}, falta={falta}, justificado={justificado}")
+            except sqlite3.IntegrityError as e:
+                logger.error(f"Conflito de chave única ao inserir presença: {e}")
+                return jsonify({'error': 'Conflito de dados. Tente novamente ou verifique a integridade do banco.'}), 409
+
+        conn.close()
+        return jsonify({
+            'message': 'Presença atualizada com sucesso',
+            'aluno_id': aluno_id,
+            'turma': turma,
+            'turno': turno_normalized,
+            'data': data_presenca,
+            'status': status
+        }), 200
+
+    except ValueError as e:
+        logger.error(f"Erro ao atualizar presença: Data inválida - {e}")
+        return jsonify({'error': str(e)}), 400
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao atualizar presença no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao inserir no banco de dados: {str(e)}'}), 500
+
+@app.route('/presenca', methods=['DELETE'])
+def delete_presenca():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição DELETE /presenca: {data}")
+
+    try:
+        aluno_id = data['aluno_id']
+        turma = data['turma']
+        turno = data['turno']
+        data_presenca = data['data']
+    except KeyError as e:
+        logger.error(f"Erro ao remover presença: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    try:
+        data_presenca = convert_date_format(data_presenca)
+        if not validate_date_format(data_presenca):
+            logger.error("Data inválida fornecida")
+            return jsonify({'error': 'Data inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        data_banco = datetime.strptime(data_presenca, '%d/%m/%Y').strftime('%d/%m/%Y')
+        turno_normalized = normalize_turno(turno)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nome FROM alunos WHERE id = ?', (aluno_id,))
+        aluno = cursor.fetchone()
+        if not aluno:
+            conn.close()
+            logger.warning(f"Aluno com ID {aluno_id} não encontrado.")
+            return jsonify({'error': 'Aluno não encontrado'}), 404
+        aluno_nome = aluno['nome']
+
+        cursor.execute('SELECT * FROM presencas WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?', (aluno_nome, turma, turno_normalized, data_banco))
+        existing_presenca = cursor.fetchone()
+        if not existing_presenca:
+            conn.close()
+            logger.info("Nenhum registro de presença encontrado para remover")
+            return jsonify({'message': 'Nenhum registro de presença encontrado para remover'}), 200
+
+        cursor.execute('DELETE FROM presencas WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?', (aluno_nome, turma, turno_normalized, data_banco))
+        conn.commit()
+        logger.info(f"Presença removida para {aluno_nome} ({turma}, {turno_normalized}) em {data_presenca}")
+        conn.close()
+        return jsonify({'message': 'Presença removida com sucesso'}), 200
+
+    except ValueError as e:
+        logger.error(f"Erro ao remover presença: Data inválida - {e}")
+        return jsonify({'error': str(e)}), 400
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao remover presença no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao remover do banco de dados: {str(e)}'}), 500
+
+@app.route('/presencas', methods=['GET'])
+def get_presencas():
+    try:
+        turma = request.args.get('turma')
+        turno = request.args.get('turno')
+        date = request.args.get('date')
+
+        if not turma or not turno or not date:
+            logger.error(f"Parâmetros obrigatórios ausentes em /presencas: turma={turma}, turno={turno}, date={date}")
+            return jsonify({'error': 'Parâmetros turma, turno e date são obrigatórios'}), 400
+
+        date = convert_date_format(date)
+        if not validate_date_format(date):
+            logger.error("Data inválida fornecida")
+            return jsonify({'error': 'Data inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        data_banco = date
+        turno_normalized = normalize_turno(turno)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT id, nome FROM alunos WHERE turma = ? AND lower(turno) = ?', (turma, turno_normalized))
+        alunos = cursor.fetchall()
+
+        cursor.execute('''
+            SELECT aluno_nome, presente, falta, justificado 
+            FROM presencas 
+            WHERE turma = ? AND lower(turno) = ? AND data = ?
+        ''', (turma, turno_normalized, data_banco))
+        presencas_db = cursor.fetchall()
+        conn.close()
+
+        presencas_map = {}
+        for presenca in presencas_db:
+            aluno_id = None
+            aluno_nome = presenca['aluno_nome']
+            for aluno in alunos:
+                if aluno['nome'] == aluno_nome:
+                    aluno_id = str(aluno['id'])
+                    break
+            if aluno_id:
+                presencas_map[aluno_id] = {
+                    'presente': bool(presenca['presente']),
+                    'falta': bool(presenca['falta']),
+                    'justificado': bool(presenca['justificado']),
+                    'nome': aluno_nome
+                }
+
+        result = {}
+        for aluno in alunos:
+            aluno_id = str(aluno['id'])
+            presenca = presencas_map.get(aluno_id, {
+                'presente': False,
+                'falta': False,
+                'justificado': False,
+                'nome': aluno['nome']
+            })
+            result[aluno_id] = presenca
+
+        logger.info(f"Presenças retornadas para turma {turma} e turno {turno_normalized} em {data_banco}: {len(result)} registros")
+        return jsonify(result), 200
+
+    except ValueError as e:
+        logger.error(f"Erro ao buscar presenças: Data inválida - {e}")
+        return jsonify({'error': str(e)}), 400
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao buscar presenças no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao buscar no banco de dados: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Erro inesperado ao buscar presenças: {e}")
+        return jsonify({'error': f'Erro inesperado: {str(e)}'}), 500
+
+@app.route('/presencas', methods=['POST'])
+def create_or_update_presencas():
+    data = request.get_json()
+    logger.info(f"Dados recebidos na requisição POST /presencas: {data}")
+
+    try:
+        turma = data['turma']
+        turno = data['turno']
+        date = data['date']
+        presencas = data['presencas']
+    except KeyError as e:
+        logger.error(f"Erro ao criar/atualizar presenças: Campo faltando - {e}")
+        return jsonify({'error': f'Campo obrigatório faltando: {e}'}), 400
+
+    if not isinstance(presencas, dict):
+        logger.error("O campo presencas deve ser um objeto com chaves de IDs de alunos")
+        return jsonify({'error': 'O campo presencas deve ser um objeto com chaves de IDs de alunos'}), 400
+
+    try:
+        date = convert_date_format(date)
+        if not validate_date_format(date):
+            logger.error("Data inválida fornecida")
+            return jsonify({'error': 'Data inválida (deve ser uma data válida no formato AAAA-MM-DD ou DD/MM/AAAA)'}), 400
+
+        data_banco = datetime.strptime(date, '%d/%m/%Y').strftime('%d/%m/%Y')
+        turno_normalized = normalize_turno(turno)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        for aluno_id, estado in presencas.items():
+            cursor.execute('SELECT nome FROM alunos WHERE id = ?', (aluno_id,))
+            aluno = cursor.fetchone()
+            if not aluno:
+                continue
+            aluno_nome = aluno['nome']
+
+            presente = bool(estado.get('presente', False))
+            falta = bool(estado.get('falta', False))
+            justificado = bool(estado.get('justificado', False))
+
+            if falta and not justificado:
+                justificado = False
+            elif justificado:
+                falta = True
+
+            cursor.execute('SELECT * FROM presencas WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?', (aluno_nome, turma, turno_normalized, data_banco))
+            existing_presenca = cursor.fetchone()
+
+            if existing_presenca:
+                try:
+                    cursor.execute(
+                        'UPDATE presencas SET presente = ?, falta = ?, justificado = ? WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND data = ?',
+                        (presente, falta, justificado, aluno_nome, turma, turno_normalized, data_banco)
+                    )
+                    logger.info(f"Presença atualizada para {aluno_nome} ({turma}, {turno_normalized}) em {date}: presente={presente}, falta={falta}, justificado={justificado}")
+                except sqlite3.IntegrityError as e:
+                    logger.error(f"Conflito de chave única ao atualizar presença: {e}")
+                    conn.rollback()
+                    continue
+            else:
+                try:
+                    cursor.execute(
+                        'INSERT INTO presencas (aluno_nome, turma, turno, data, presente, falta, justificado) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        (aluno_nome, turma, turno_normalized, data_banco, presente, falta, justificado)
+                    )
+                    logger.info(f"Presença criada para {aluno_nome} ({turma}, {turno_normalized}) em {date}: presente={presente}, falta={falta}, justificado={justificado}")
+                except sqlite3.IntegrityError as e:
+                    logger.error(f"Conflito de chave única ao inserir presença: {e}")
+                    conn.rollback()
+                    continue
+
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Presenças atualizadas com sucesso', 'turma': turma, 'turno': turno_normalized, 'date': date}), 200
+
+    except ValueError as e:
+        logger.error(f"Erro ao criar/atualizar presenças: Data inválida - {e}")
+        return jsonify({'error': str(e)}), 400
+    except sqlite3.Error as e:
+        logger.error(f"Erro ao criar/atualizar presenças no banco de dados: {e}")
+        return jsonify({'error': f'Erro ao inserir no banco de dados: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Erro inesperado ao criar/atualizar presenças: {e}")
+        return jsonify({'error': f'Erro inesperado: {str(e)}'}), 500
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    valid_credentials = [
+        {'username': 'CSantos', 'password': 'Pazebem@'},
+        {'username': 'thaisrissi', 'password': 'thais01030127!'}
+    ]
+    if any(cred['username'] == username and cred['password'] == password for cred in valid_credentials):
+        logger.info(f"Login bem-sucedido para usuário: {username}")
+        return jsonify({'success': True, 'redirect': '/painel'}), 200
+    else:
+        logger.warning(f"Login falhou para usuário: {username}")
+        return jsonify({'success': False, 'error': 'Usuário ou senha inválidos'}), 401
+
+if __name__ == '__main__':
+    initialize_app()
+    port = find_free_port()
+    logger.info(f"Iniciando aplicação na porta {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)

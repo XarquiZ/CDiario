@@ -1,0 +1,703 @@
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: #F8FAFF;
+  color: #1E293B;
+  padding: 0;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-container {
+  padding-left: 5% !important;
+  padding-right: 5% !important;
+  max-width: 100%;
+}
+
+.tab-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: #F1F5F9;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  padding: 0.125rem;
+}
+
+.tab-option {
+  flex: 1;
+  text-align: center;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  color: #6B7280;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tab-option.active {
+  background-color: #FFFFFF;
+  color: #000000;
+  font-weight: 600;
+  border-radius: 0.25rem;
+  margin: 0.125rem;
+}
+
+.nova-turma-btn, .novo-aluno-btn {
+  background-color: #BF609E;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.3s;
+  height: 2.5rem;
+  line-height: 1;
+}
+
+.nova-turma-btn:hover, .novo-aluno-btn:hover {
+  background-color: #A3477C;
+}
+
+.title-section {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.title-controls-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title-controls-wrapper h2 {
+  line-height: 2.5rem;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+#controls-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#action-buttons-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filters-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.action-buttons-section {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filtro-turmas, .busca-aluno, .filtro-turno {
+  border: 1px solid #CBD5E1;
+  border-radius: 0.375rem;
+  color: #475569;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  outline: none;
+  height: 2.5rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.filtro-turmas:focus, .busca-aluno:focus, .filtro-turno:focus {
+  outline: 2px solid #2563EB;
+  border-color: transparent;
+}
+
+.busca-aluno {
+  padding-left: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%23475569'%3E%3Cpath d='M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.75rem center;
+  background-size: 1.25rem;
+}
+
+#content-area {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  width: 100%;
+}
+
+#content-area.fade {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* Estilos para Turmas */
+.turma-card {
+  background-color: #FFFFFF;
+  border-radius: 0.375rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid #000000;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  max-width: 100%;
+}
+
+.turma-card h3 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+  color: #0F172A;
+}
+
+.turma-card p {
+  font-size: 0.875rem;
+  color: #64748B;
+  margin-bottom: 1.5rem;
+}
+
+.editar-btn {
+  background-color: #2563EB;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.3s;
+  max-width: 100%;
+}
+
+.editar-btn:hover {
+  background-color: #1E40AF;
+}
+
+.editar-btn:disabled {
+  background-color: #D1D5DB;
+  cursor: not-allowed;
+}
+
+.excluir-btn {
+  background-color: #EF4444;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.3s;
+  max-width: 100%;
+}
+
+.excluir-btn:hover {
+  background-color: #B91C1C;
+}
+
+.excluir-btn:disabled {
+  background-color: #D1D5DB;
+  cursor: not-allowed;
+}
+
+.transferir-btn {
+  background-color: #16A34A;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.3s;
+  max-width: 100%;
+}
+
+.transferir-btn:hover {
+  background-color: #15803D;
+}
+
+.transferir-btn:disabled {
+  background-color: #D1D5DB;
+  cursor: not-allowed;
+}
+
+/* Estilos para Alunos */
+.alunos-section {
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Estilos para os cards de alunos (versão com expansão) */
+.aluno-card {
+  background-color: #FFFFFF;
+  border-radius: 0.375rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid #000000;
+  transition: transform 0.2s;
+  position: relative;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.aluno-card:hover {
+  transform: translateY(-2px);
+}
+
+.aluno-card.selected {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 2px #2563EB;
+}
+
+.aluno-checkbox {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 1rem;
+  height: 1rem;
+  accent-color: #2563EB;
+}
+
+.acao-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 0.3s, color 0.3s;
+  max-width: 100%;
+}
+
+/* Estilo específico para o botão Editar */
+.acao-btn:has(i.fa-user-friends) {
+  background-color: #2563EB;
+  color: white;
+}
+
+.acao-btn:has(i.fa-user-friends):hover {
+  background-color: #1E40AF;
+  color: white;
+}
+
+/* Estilo específico para o botão Transferir */
+.acao-btn:has(i.fa-arrows-alt) {
+  background-color: #16A34A;
+  color: white;
+}
+
+.acao-btn:has(i.fa-arrows-alt):hover {
+  background-color: #15803D;
+  color: white;
+}
+
+.acao-excluir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #EF4444;
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  transition: background-color 0.3s, color 0.3s;
+  max-width: 100%;
+}
+
+.acao-excluir-btn i {
+  color: #FFFFFF;
+}
+
+.acao-excluir-btn:hover {
+  background-color: #DC2626;
+  color: #FFFFFF;
+}
+
+.acao-excluir-btn:hover i {
+  color: #FFFFFF;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Estilos para o Modal de Login e outros */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease-in-out;
+}
+
+.modal.open {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 24rem;
+  padding: 1.5rem;
+  position: relative;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.modal.open .modal-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: #9CA3AF;
+  font-size: 1.125rem;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #4B5563;
+}
+
+.modal-content label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.modal-content input:not([type="checkbox"]):not([type="radio"]) {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.375rem;
+  color: #111827;
+  margin-bottom: 1.5rem;
+  outline: none;
+}
+
+.modal-content input:not([type="checkbox"]):not([type="radio"]):focus {
+  outline: 2px solid #2563EB;
+  border-color: #2563EB;
+}
+
+.modal-content select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.375rem;
+  color: #111827;
+  margin-bottom: 1.5rem;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%239CA3AF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1em 1em;
+}
+
+.modal-content select:focus {
+  outline: 2px solid #2563EB;
+  border-color: #2563EB;
+}
+
+.modal-content fieldset {
+  margin-bottom: 1.5rem;
+}
+
+.modal-content legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.modal-content .options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.modal-content .options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.modal-content input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.25rem;
+  color: #2563EB;
+}
+
+.modal-content input[type="checkbox"]:focus {
+  outline: 2px solid #2563EB;
+}
+
+.modal-content .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.modal-content button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.modal-content .cancel-btn {
+  border: 1px solid #D1D5DB;
+  color: #111827;
+  font-weight: 400;
+}
+
+.modal-content .cancel-btn:hover {
+  background-color: #F3F4F6;
+}
+
+.modal-content .create-btn {
+  background-color: #2563EB;
+  color: #fff;
+  font-weight: 600;
+}
+
+.modal-content .create-btn:hover {
+  background-color: #1E40AF;
+}
+
+/* Estilos para o Modal de Alunos */
+#novo-aluno-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease-in-out;
+}
+
+#novo-aluno-modal.open {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+#novo-aluno-modal .modal-content {
+  background-color: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+#novo-aluno-modal.open .modal-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#novo-aluno-modal .modal-content h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+#novo-aluno-btn {
+  background-color: #2563EB;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#novo-aluno-btn:hover {
+  background-color: #1E40AF;
+}
+
+/* Outros estilos */
+.welcome-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: black;
+}
+
+.content-wrapper {
+  flex: 1 0 auto;
+}
+
+.footer-wrapper {
+  flex-shrink: 0;
+}
+
+/* Classes para os botões com cores personalizadas */
+.btn-orange {
+  background-color: #F2A81D;
+  color: white;
+  transition: background-color 0.3s;
+}
+
+.btn-orange:hover {
+  background-color: #D68E18;
+}
+
+.btn-purple {
+  background-color: #BF609E;
+  color: white;
+  transition: background-color 0.3s;
+}
+
+.btn-purple:hover {
+  background-color: #A3477C;
+}
+
+/* Estilos para o Calendário */
+#calendar-container {
+  margin: 20px 0;
+  text-align: center;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.calendar-table-container {
+  display: inline-block;
+  max-width: 100%;
+}
+
+#calendar-container table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  table-layout: fixed;
+}
+
+#calendar-container th,
+#calendar-container td {
+  border: 1px solid #CBD5E1;
+  padding: 8px;
+  text-align: center;
+  width: 14.28%;
+  box-sizing: border-box;
+}
+
+#calendar-container th {
+  background-color: #2563EB;
+  color: white;
+  font-weight: 600;
+}
+
+#calendar-container td {
+  cursor: pointer;
+  background-color: #FFFFFF;
+  transition: background-color 0.3s;
+}
+
+#calendar-container td:hover {
+  background-color: #F3F4F6;
+}
+
+#calendar-container td.empty {
+  background-color: #F1F5F9;
+  cursor: default;
+}
+
+#calendar-container .calendar-day {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  border-radius: 50%;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin: 0 auto;
+}
+
+#calendar-container .calendar-day.selected {
+  background-color: #2563EB;
+  color: white;
+  border-radius: 0.375rem;
+}
+
+#calendar-container td.text-[#D1D5DB] {
+  color: #D1D5DB;
+  cursor: default;
+}
+
+#calendar-container .calendar-day.non-school-day {
+  color: #9CA3AF;
+  cursor: not-allowed;
+  background-color: #F1F5F9;
+}
+
+/* Estilos para os cards de estatística */
+#presentes-card,
+#ausentes-card,
+#taxa-card {
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+}

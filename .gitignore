@@ -1,0 +1,25 @@
+# Ambientes Virtuais
+venv/
+.env
+.env.local
+
+# Google OAuth Credenciais
+credentials.json
+client_secret*.json
+token.json
+
+# Python / Compilação
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+*.spec
+
+# Banco de dados local SQLite
+*.db
+*.sqlite3
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db

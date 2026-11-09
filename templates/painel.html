@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel de Gerenciamento</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="bg-[#F8FAFF] text-[#1E293B] min-h-screen">
+  <header class="flex items-center justify-between px-6 py-2.5 border-b border-gray-200 bg-white">
+    <div class="flex items-center gap-4">
+      <button aria-label="Voltar" class="text-[#1E293B] text-base font-normal flex items-center gap-1 hover:text-blue-600 transition" onclick="window.location.href='/'">
+        <i class="fas fa-arrow-left text-sm"></i>
+        <span>Voltar</span>
+      </button>
+      <h1 class="text-[#2563EB] font-extrabold text-lg leading-6 select-none">Painel de Gerenciamento</h1>
+    </div>
+    <div>
+      <img src="/static/logo.png" alt="Logo CEDESP Rede Comunitá" class="h-10 object-contain">
+    </div>
+  </header>
+
+  <div class="w-full mx-auto mt-6 main-container">
+    <nav class="mb-8">
+      <div class="flex flex-col w-full">
+        <div class="flex flex-col w-full">
+          <div class="tab-container w-full">
+            <div class="tab-option active" onclick="switchTab('turmas')">Gerenciar Turmas</div>
+            <div class="tab-option" onclick="switchTab('alunos')">Gerenciar Alunos</div>
+          </div>
+          <div class="title-section mt-4">
+            <div class="title-controls-wrapper">
+              <h2 class="font-extrabold text-xl text-[#0F172A] leading-6 select-none" style="font-weight: 800;" id="section-title"></h2>
+              <div id="controls-container"></div>
+            </div>
+            <div id="action-buttons-container"></div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <section id="content-area">
+        <!-- Conteúdo inicial será preenchido pelo JavaScript -->
+      </section>
+
+      <!-- Modal para Turmas e Transferência -->
+      <div class="modal fixed inset-0 bg-black bg-opacity-50 hidden z-50" id="modal">
+        <div class="modal-content max-w-2xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <button type="button" aria-label="Fechar" class="close absolute top-4 right-4" onclick="closeModal()">
+            <i class="fas fa-times text-lg"></i>
+          </button>
+          <h2 id="modal-title" class="text-gray-900 font-semibold text-lg leading-6 mb-4">Criar Nova Turma</h2>
+          <p class="text-gray-500 text-sm mb-6 leading-relaxed">Preencha as informações para criar uma nova turma.</p>
+          <form id="turma-form">
+            <label for="nome-turma" class="block text-gray-900 font-semibold text-sm mb-2">Nome da Turma</label>
+            <input
+              id="nome-turma"
+              name="nome-turma"
+              type="text"
+              placeholder="Ex: Turma A"
+              class="w-full border border-blue-600 rounded-md px-3 py-2 text-gray-400 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 mb-6"
+              required
+            />
+            <fieldset class="mb-6">
+              <legend class="text-gray-900 font-semibold text-sm mb-2">Turnos Disponíveis</legend>
+              <div class="options">
+                <label class="inline-flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="turnos"
+                    value="Manhã"
+                    class="w-4 h-4 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                  />
+                  <span>Manhã</span>
+                </label>
+                <label class="inline-flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="turnos"
+                    value="Tarde"
+                    class="w-4 h-4 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                  />
+                  <span>Tarde</span>
+                </label>
+                <label class="inline-flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="turnos"
+                    value="Noite"
+                    class="w-4 h-4 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                  />
+                  <span>Noite</span>
+                </label>
+              </div>
+            </fieldset>
+            <div class="buttons flex justify-end space-x-4">
+              <button
+                type="button"
+                class="cancel-btn px-4 py-2 rounded-md border border-gray-300 text-gray-900 text-sm font-normal hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                onclick="closeModal()"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="action-btn"
+                class="create-btn px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                Criar Turma
+              </button>
+            </div>
+          </form>
+          <form id="aluno-form" class="hidden">
+            <!-- Este formulário está vazio porque o modal de aluno tem seu próprio modal -->
+          </form>
+          <form id="transfer-form" class="hidden">
+            <div class="mb-4">
+              <label for="transfer-turma" class="block text-gray-900 font-semibold text-sm mb-2">Turma</label>
+              <select
+                id="transfer-turma"
+                name="transfer-turma"
+                class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+              >
+                <option value="">Selecione uma turma</option>
+              </select>
+            </div>
+            <div class="mb-6">
+              <label for="transfer-turno" class="block text-gray-900 font-semibold text-sm mb-2">Turno</label>
+              <select
+                id="transfer-turno"
+                name="transfer-turno"
+                class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+              >
+                <option value="">Selecione um turno</option>
+              </select>
+            </div>
+            <div class="buttons flex justify-end space-x-4">
+              <button
+                type="button"
+                class="cancel-btn px-4 py-2 rounded-md border border-gray-300 text-gray-900 text-sm font-normal hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                onclick="closeModal()"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="transfer-action-btn"
+                class="create-btn px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+              >
+                Transferir
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal para Novo/Editar Aluno -->
+      <div class="modal fixed inset-0 bg-black bg-opacity-50 hidden z-50" id="novo-aluno-modal">
+        <div class="modal-content w-4/5 max-w-6xl mx-auto mt-10 h-[85vh] bg-white rounded-lg shadow-lg flex flex-col" role="dialog" aria-modal="true" aria-labelledby="novo-aluno-title">
+          <div class="flex-shrink-0 p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 id="novo-aluno-title" class="text-gray-900 font-semibold text-lg leading-6">Cadastrar Novo Aluno</h2>
+                <p class="text-gray-500 text-sm mt-1 leading-relaxed">Preencha as informações para cadastrar um novo aluno.</p>
+              </div>
+              <button type="button" aria-label="Fechar" class="text-gray-600 hover:text-gray-800" onclick="closeModal()">
+                <i class="fas fa-times text-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-6">
+            <form id="novo-aluno-form" class="space-y-6">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dados Pessoais -->
+                <div class="mb-4">
+                  <label for="nome-aluno" class="block text-gray-900 font-semibold text-sm mb-2">Nome Civil *</label>
+                  <input
+                    id="nome-aluno"
+                    name="nome-aluno"
+                    type="text"
+                    placeholder="Nome completo"
+                    class="w-full border border-blue-600 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    required
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="nis" class="block text-gray-900 font-semibold text-sm mb-2">NIS</label>
+                  <input
+                    id="nis"
+                    name="nis"
+                    type="text"
+                    placeholder="Ex: 12345678901"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="data-nascimento" class="block text-gray-900 font-semibold text-sm mb-2">Data de Nascimento</label>
+                  <input
+                    id="data-nascimento"
+                    name="data-nascimento"
+                    type="date"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="rg" class="block text-gray-900 font-semibold text-sm mb-2">RG</label>
+                  <input
+                    id="rg"
+                    name="rg"
+                    type="text"
+                    placeholder="Ex: 1234567"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="orgao" class="block text-gray-900 font-semibold text-sm mb-2">Orgão</label>
+                  <input
+                    id="orgao"
+                    name="orgao"
+                    type="text"
+                    placeholder="Ex: SSP"
+                    maxlength="10"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="uf-rg" class="block text-gray-900 font-semibold text-sm mb-2">UF</label>
+                  <select
+                    id="uf-rg"
+                    name="uf-rg"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="AC">Acre</option>
+                    <option value="AL">Alagoas</option>
+                    <option value="AP">Amapá</option>
+                    <option value="AM">Amazonas</option>
+                    <option value="BA">Bahia</option>
+                    <option value="CE">Ceará</option>
+                    <option value="DF">Distrito Federal</option>
+                    <option value="ES">Espírito Santo</option>
+                    <option value="GO">Goiás</option>
+                    <option value="MA">Maranhão</option>
+                    <option value="MT">Mato Grosso</option>
+                    <option value="MS">Mato Grosso do Sul</option>
+                    <option value="MG">Minas Gerais</option>
+                    <option value="PA">Pará</option>
+                    <option value="PB">Paraíba</option>
+                    <option value="PR">Paraná</option>
+                    <option value="PE">Pernambuco</option>
+                    <option value="PI">Piauí</option>
+                    <option value="RJ">Rio de Janeiro</option>
+                    <option value="RN">Rio Grande do Norte</option>
+                    <option value="RS">Rio Grande do Sul</option>
+                    <option value="RO">Rondônia</option>
+                    <option value="RR">Roraima</option>
+                    <option value="SC">Santa Catarina</option>
+                    <option value="SP">São Paulo</option>
+                    <option value="SE">Sergipe</option>
+                    <option value="TO">Tocantins</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="cpf" class="block text-gray-900 font-semibold text-sm mb-2">CPF</label>
+                  <input
+                    id="cpf"
+                    name="cpf"
+                    type="text"
+                    placeholder="Ex: 123.456.789-00"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="sexo" class="block text-gray-900 font-semibold text-sm mb-2">Sexo</label>
+                  <select
+                    id="sexo"
+                    name="sexo"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Feminino">Feminino</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="nacionalidade" class="block text-gray-900 font-semibold text-sm mb-2">Nacionalidade</label>
+                  <input
+                    id="nacionalidade"
+                    name="nacionalidade"
+                    type="text"
+                    placeholder="Ex: Brasileira"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="naturalidade" class="block text-gray-900 font-semibold text-sm mb-2">Naturalidade</label>
+                  <input
+                    id="naturalidade"
+                    name="naturalidade"
+                    type="text"
+                    placeholder="Ex: São Paulo"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="uf-naturalidade" class="block text-gray-900 font-semibold text-sm mb-2">UF</label>
+                  <select
+                    id="uf-naturalidade"
+                    name="uf-naturalidade"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="AC">Acre</option>
+                    <option value="AL">Alagoas</option>
+                    <option value="AP">Amapá</option>
+                    <option value="AM">Amazonas</option>
+                    <option value="BA">Bahia</option>
+                    <option value="CE">Ceará</option>
+                    <option value="DF">Distrito Federal</option>
+                    <option value="ES">Espírito Santo</option>
+                    <option value="GO">Goiás</option>
+                    <option value="MA">Maranhão</option>
+                    <option value="MT">Mato Grosso</option>
+                    <option value="MS">Mato Grosso do Sul</option>
+                    <option value="MG">Minas Gerais</option>
+                    <option value="PA">Pará</option>
+                    <option value="PB">Paraíba</option>
+                    <option value="PR">Paraná</option>
+                    <option value="PE">Pernambuco</option>
+                    <option value="PI">Piauí</option>
+                    <option value="RJ">Rio de Janeiro</option>
+                    <option value="RN">Rio Grande do Norte</option>
+                    <option value="RS">Rio Grande do Sul</option>
+                    <option value="RO">Rondônia</option>
+                    <option value="RR">Roraima</option>
+                    <option value="SC">Santa Catarina</option>
+                    <option value="SP">São Paulo</option>
+                    <option value="SE">Sergipe</option>
+                    <option value="TO">Tocantins</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="nome-pai" class="block text-gray-900 font-semibold text-sm mb-2">Nome do Pai</label>
+                  <input
+                    id="nome-pai"
+                    name="nome-pai"
+                    type="text"
+                    placeholder="Ex: João Silva"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="nome-mae" class="block text-gray-900 font-semibold text-sm mb-2">Nome da Mãe</label>
+                  <input
+                    id="nome-mae"
+                    name="nome-mae"
+                    type="text"
+                    placeholder="Ex: Maria Oliveira"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="etnia" class="block text-gray-900 font-semibold text-sm mb-2">Etnia</label>
+                  <select
+                    id="etnia"
+                    name="etnia"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Amarela">Amarela</option>
+                    <option value="Branca">Branca</option>
+                    <option value="Indigena">Indígena</option>
+                    <option value="Negra">Negra</option>
+                    <option value="Parda">Parda</option>
+                    <option value="Nao Declarante">Não Declarante</option>
+                  </select>
+                </div>
+
+                <!-- Deficiência e Necessidades Educacionais Especiais -->
+                <div class="mb-4 col-span-1 sm:col-span-2 lg:col-span-3">
+                  <label class="block text-gray-900 font-semibold text-sm mb-2">Deficiência e Necessidades Educacionais Especiais</label>
+                  <div class="grid grid-cols-2 gap-4">
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Nao Possui"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Não Possui</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Auditiva"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Auditiva</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Fisica"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Física</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Visual"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Visual</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Mental"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Mental</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Multipla"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Múltipla</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="deficiencia"
+                        value="Outras"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Outras</span>
+                    </label>
+                    <div class="col-span-2">
+                      <input
+                        id="outras-deficiencia"
+                        name="outras-deficiencia"
+                        type="text"
+                        placeholder="Especifique outras"
+                        class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Situação Ocupacional -->
+                <div class="mb-4 col-span-1 sm:col-span-2 lg:col-span-3">
+                  <label class="block text-gray-900 font-semibold text-sm mb-2">Situação Ocupacional</label>
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Autonomo"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Autônomo</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Empregado com Carteira"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Empregado com Carteira</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Empregado sem Carteira"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Empregado sem Carteira</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Empregador"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Empregador</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Profissional Liberal"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Profissional Liberal</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Desempregado em busca do 1° Emprego"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Desempregado 1° Emprego</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Desempregado"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Desempregado</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="situacao-ocupacional"
+                        value="Aposentado"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Aposentado</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Endereço -->
+                <div class="mb-4">
+                  <label for="cep" class="block text-gray-900 font-semibold text-sm mb-2">CEP</label>
+                  <input
+                    id="cep"
+                    name="cep"
+                    type="text"
+                    placeholder="Ex: 12345-678"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="rua" class="block text-gray-900 font-semibold text-sm mb-2">Rua/Avenida</label>
+                  <input
+                    id="rua"
+                    name="rua"
+                    type="text"
+                    placeholder="Ex: Rua Exemplo"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="numero" class="block text-gray-900 font-semibold text-sm mb-2">N°</label>
+                  <input
+                    id="numero"
+                    name="numero"
+                    type="text"
+                    placeholder="Ex: 123"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-400 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="bairro" class="block text-gray-900 font-semibold text-sm mb-2">Bairro</label>
+                  <input
+                    id="bairro"
+                    name="bairro"
+                    type="text"
+                    placeholder="Ex: Centro"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="municipio" class="block text-gray-900 font-semibold text-sm mb-2">Município</label>
+                  <input
+                    id="municipio"
+                    name="municipio"
+                    type="text"
+                    placeholder="Ex: São Paulo"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="estado" class="block text-gray-900 font-semibold text-sm mb-2">Estado</label>
+                  <select
+                    id="estado"
+                    name="estado"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="AC">Acre</option>
+                    <option value="AL">Alagoas</option>
+                    <option value="AP">Amapá</option>
+                    <option value="AM">Amazonas</option>
+                    <option value="BA">Bahia</option>
+                    <option value="CE">Ceará</option>
+                    <option value="DF">Distrito Federal</option>
+                    <option value="ES">Espírito Santo</option>
+                    <option value="GO">Goiás</option>
+                    <option value="MA">Maranhão</option>
+                    <option value="MT">Mato Grosso</option>
+                    <option value="MS">Mato Grosso do Sul</option>
+                    <option value="MG">Minas Gerais</option>
+                    <option value="PA">Pará</option>
+                    <option value="PB">Paraíba</option>
+                    <option value="PR">Paraná</option>
+                    <option value="PE">Pernambuco</option>
+                    <option value="PI">Piauí</option>
+                    <option value="RJ">Rio de Janeiro</option>
+                    <option value="RN">Rio Grande do Norte</option>
+                    <option value="RS">Rio Grande do Sul</option>
+                    <option value="RO">Rondônia</option>
+                    <option value="RR">Roraima</option>
+                    <option value="SC">Santa Catarina</option>
+                    <option value="SP">São Paulo</option>
+                    <option value="SE">Sergipe</option>
+                    <option value="TO">Tocantins</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="telefone" class="block text-gray-900 font-semibold text-sm mb-2">Telefone</label>
+                  <input
+                    id="telefone"
+                    name="telefone"
+                    type="tel"
+                    placeholder="Ex: (11) 1234-5678"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="celular" class="block text-gray-900 font-semibold text-sm mb-2">Celular</label>
+                  <input
+                    id="celular"
+                    name="celular"
+                    type="tel"
+                    placeholder="Ex: (11) 98765-4321"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label for="email" class="block text-gray-900 font-semibold text-sm mb-2">E-Mail</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="Ex: aluno@exemplo.com"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  />
+                </div>
+
+                <!-- Escolaridade e Situação -->
+                <div class="mb-4 col-span-1 sm:col-span-2 lg:col-span-3">
+                  <label class="block text-gray-900 font-semibold text-sm mb-2">Escolaridade</label>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="escolaridade"
+                        value="Ensino Fundamental"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Ensino Fundamental</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="escolaridade"
+                        value="Ensino Médio"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Ensino Médio</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="escolaridade"
+                        value="Ensino Superior"
+                        class="w-5 h-5 border border-gray-300 rounded text-blue-600 focus:ring-blue-600"
+                      />
+                      <span>Ensino Superior</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="mb-4">
+                  <label for="situacao-escolar" class="block text-gray-900 font-semibold text-sm mb-2">Situação</label>
+                  <select
+                    id="situacao-escolar"
+                    name="situacao-escolar"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Concluído">Concluído</option>
+                    <option value="Cursando">Cursando</option>
+                  </select>
+                </div>
+                <div class="mb-4">
+                  <label for="turma-aluno" class="block text-gray-900 font-semibold text-sm mb-2">Turma</label>
+                  <select
+                    id="turma-aluno"
+                    name="turma-aluno"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione uma turma (opcional)</option>
+                  </select>
+                </div>
+                <div class="mb-6">
+                  <label for="turno-aluno" class="block text-gray-900 font-semibold text-sm mb-2">Turno</label>
+                  <select
+                    id="turno-aluno"
+                    name="turno-aluno"
+                    class="w-full border border-gray-200 rounded-md px-4 py-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  >
+                    <option value="">Selecione um turno (opcional)</option>
+                    <option value="Manhã">Manhã</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Noite">Noite</option>
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="flex-shrink-0 p-6 border-t border-gray-200 flex justify-end space-x-4">
+            <button
+              type="button"
+              class="px-6 py-3 rounded-md border border-gray-200 text-gray-900 text-sm font-normal hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              onclick="closeModal()"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              id="novo-aluno-btn"
+              class="px-6 py-3 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              Cadastrar Aluno
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/script.js"></script>
+</body>
+</html>
