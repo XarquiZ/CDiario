@@ -158,7 +158,7 @@ def classroom_auth():
     if return_to:
         session['oauth_return_to'] = return_to
 
-    redirect_uri = url_for('classroom.oauth2callback', _external=True)
+    redirect_uri = url_for('classroom.oauth2callback', _external=True, _scheme='https')
     try:
         flow = create_flow(redirect_uri)
         auth_url, state = flow.authorization_url(
@@ -179,7 +179,7 @@ def classroom_auth():
 def oauth2callback():
     """Callback do Google OAuth."""
     state = session.get('oauth_state')
-    redirect_uri = url_for('classroom.oauth2callback', _external=True)
+    redirect_uri = url_for('classroom.oauth2callback', _external=True, _scheme='https')
     turma_id = session.pop('oauth_turma_id', None)
     return_to = session.pop('oauth_return_to', None)
 
