@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 app.secret_key = os.environ.get('SECRET_KEY', 'rcdiario-secreta-instituicao-2026')
+app.config.update(
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True
+)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.register_blueprint(pages_bp)

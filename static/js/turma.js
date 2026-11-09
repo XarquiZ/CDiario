@@ -1288,7 +1288,7 @@ async function verificarMetadadosTurma() {
     const res = await fetch('/turmas?status=todos');
     if (!res.ok) return;
     const turmas = await res.json();
-    const t = turmas.find(item => item.nome === window.turmaNome);
+    const t = turmas.find(item => item.nome.trim().toLowerCase() === window.turmaNome.trim().toLowerCase());
     if (!t) return;
 
     currentTurmaId = t.id;
@@ -1332,25 +1332,45 @@ async function verificarMetadadosTurma() {
 
 // Modal e Vinculação de Sala do Classroom pelo Professor
 async function abrirModalVincularClassroom() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramTurmaId = urlParams.get('turma_id');
+  if (!currentTurmaId && paramTurmaId) {
+    currentTurmaId = parseInt(paramTurmaId, 10);
+  }
+
   if (!currentTurmaId) {
     alert('Identificador da turma não localizado.');
     return;
   }
 
+  // Abre o modal imediatamente exibindo estado de carregamento
+  const modal = document.getElementById('modal-vincular-classroom');
+  if (modal) modal.classList.remove('hidden');
+
+  const listaEl = document.getElementById('lista-salas-vincular');
+  if (listaEl) {
+    listaEl.innerHTML = '<p class="text-xs text-gray-400 py-4 text-center"><i class="fas fa-spinner fa-spin mr-1"></i> Verificando conexão com o Google...</p>';
+  }
+
   // Verifica se o professor está autenticado no Google
-  const statusRes = await fetch(`/classroom/status?turma_id=${currentTurmaId}`);
-  const statusData = await statusRes.json();
+  let statusData = { connected: false };
+  try {
+    const statusRes = await fetch(`/classroom/status?turma_id=${currentTurmaId}`);
+    if (statusRes.ok) {
+      statusData = await statusRes.json();
+    }
+  } catch (e) {
+    console.warn('Erro ao verificar status classroom:', e);
+  }
 
   if (!statusData.connected) {
+    if (modal) modal.classList.add('hidden');
     if (confirm('Para vincular esta turma oficial à sua sala do Google Classroom, conecte sua conta Google. Deseja prosseguir para o login?')) {
-      const returnUrl = encodeURIComponent(window.location.pathname + '?action=vincular');
+      const returnUrl = encodeURIComponent(window.location.pathname + '?action=vincular&turma_id=' + currentTurmaId);
       window.location.href = `/classroom/auth?turma_id=${currentTurmaId}&return_to=${returnUrl}`;
     }
     return;
   }
-
-  const modal = document.getElementById('modal-vincular-classroom');
-  if (modal) modal.classList.remove('hidden');
 
   carregarSalasDoProfessor();
 }
@@ -1516,9 +1536,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   console.log('Valores definidos no DOMContentLoaded - window.turmaNome:', window.turmaNome, 'window.turmaTurno:', window.turmaTurno);
+  
+  if (urlParams.get('action') === 'vincular') {
+    if (urlParams.get('turma_id')) {
+      currentTurmaId = parseInt(urlParams.get('turma_id'), 10);
+    }
+    abrirModalVincularClassroom();
+  }
+
   verificarMetadadosTurma().then(() => {
-    if (urlParams.get('action') === 'vincular') {
-      abrirModalVincularClassroom();
+    if (urlParams.get('action') === 'vincular' && !document.getElementById('modal-vincular-classroom').classList.contains('hidden')) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   });

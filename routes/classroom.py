@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session, redirect, url_for
 import json
 import logging
+import base64
 from database import get_db_connection
 from services.classroom_service import (
     create_flow,
@@ -158,15 +159,23 @@ def classroom_auth():
     if return_to:
         session['oauth_return_to'] = return_to
 
+    # Codifica turma_id e return_to no state para sobreviver caso a sessão cookie seja perdida
+    state_data = {
+        'turma_id': turma_id,
+        'return_to': return_to
+    }
+    encoded_state = base64.urlsafe_b64encode(json.dumps(state_data).encode()).decode()
+
     redirect_uri = url_for('classroom.oauth2callback', _external=True, _scheme='https')
     try:
         flow = create_flow(redirect_uri)
-        auth_url, state = flow.authorization_url(
+        auth_url, _ = flow.authorization_url(
+            state=encoded_state,
             access_type='offline',
             include_granted_scopes='true',
             prompt='consent'
         )
-        session['oauth_state'] = state
+        session['oauth_state'] = encoded_state
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Erro ao iniciar fluxo OAuth: {e}")
@@ -178,10 +187,23 @@ def classroom_auth():
 @classroom_bp.route('/oauth2callback', methods=['GET'])
 def oauth2callback():
     """Callback do Google OAuth."""
-    state = session.get('oauth_state')
-    redirect_uri = url_for('classroom.oauth2callback', _external=True, _scheme='https')
+    raw_state = request.args.get('state')
     turma_id = session.pop('oauth_turma_id', None)
     return_to = session.pop('oauth_return_to', None)
+
+    # Recupera turma_id e return_to do state caso a sessão tenha sido perdida
+    if raw_state:
+        try:
+            padded = raw_state + '=' * (-len(raw_state) % 4)
+            decoded = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+            if not turma_id:
+                turma_id = decoded.get('turma_id')
+            if not return_to:
+                return_to = decoded.get('return_to')
+        except Exception as e:
+            logger.debug(f"Não foi possível decodificar custom state: {e}")
+
+    redirect_uri = url_for('classroom.oauth2callback', _external=True, _scheme='https')
 
     try:
         flow = create_flow(redirect_uri)
