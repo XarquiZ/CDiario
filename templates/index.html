@@ -3,23 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Gerenciamento Escolar</title>
+  <title>CDiario - Sistema de Gerenciamento Escolar</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <!-- Navbar -->
-  <nav class="bg-white shadow-md p-4 flex items-center">
-    <div class="flex items-center">
+  <nav class="bg-white shadow-md p-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
       <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo da Rede Comunitária" class="h-10">
+      <span class="font-extrabold text-blue-600 text-lg hidden sm:inline">CDiario</span>
     </div>
+    <div class="text-xs text-gray-500 font-medium">Versão 2.0 (Online Cloud)</div>
   </nav>
 
   <!-- Mensagens de Boas-Vindas -->
-  <div class="text-center py-2">
-    <p class="welcome-text mb-1">Bem-vindo ao Sistema de Gerenciamento Escolar</p>
-    <p class="text-gray-600">Selecione uma opção abaixo para continuar</p>
+  <div class="text-center py-4">
+    <p class="welcome-text mb-1 text-2xl font-bold text-gray-900">CDiario • Gestão Pedagógica</p>
+    <p class="text-gray-600 text-sm">Selecione uma opção abaixo para continuar</p>
   </div>
 
   <!-- Conteúdo Principal -->

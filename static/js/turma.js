@@ -18,13 +18,16 @@ function getSafeTurmaTurno() {
   return { turma, turno };
 }
 
-async function fetchAlunos(turmaNome, turno) {
+let currentAlunoStatusFilter = 'ativo';
+let currentTurmaId = null;
+
+async function fetchAlunos(turmaNome, turno, status = currentAlunoStatusFilter) {
   try {
     if (!turmaNome || !turno) {
       throw new Error('Turma ou turno não especificados.');
     }
     const turnoNormalized = removeAccents(turno).toLowerCase();
-    const url = `/alunos?turma=${encodeURIComponent(turmaNome)}&turno=${encodeURIComponent(turnoNormalized)}&t=${Date.now()}`;
+    const url = `/alunos?turma=${encodeURIComponent(turmaNome)}&turno=${encodeURIComponent(turnoNormalized)}&status=${encodeURIComponent(status)}&t=${Date.now()}`;
     console.log('Requisição para:', url);
 
     const response = await fetch(url, {
@@ -229,7 +232,7 @@ async function renderAlunos(turmaNome, containerId = 'content-area') {
     if (contentArea) contentArea.innerHTML = '<p class="text-center text-red-600">Erro: Turma não especificada. Por favor, selecione uma turma.</p>';
     return;
   }
-  const alunos = await fetchAlunos(turmaNome, turno);
+  const alunos = await fetchAlunos(turmaNome, turno, currentAlunoStatusFilter);
   const contentArea = document.getElementById(containerId);
   if (!contentArea) {
     console.error(`Elemento #${containerId} não encontrado`);
@@ -240,23 +243,102 @@ async function renderAlunos(turmaNome, containerId = 'content-area') {
   contentArea.style.margin = '0';
 
   alunos.sort((a, b) => a.nome.localeCompare(b.nome));
-  let html = '';
+
+  // Barra de ferramentas e contadores da turma
+  let html = `
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-gray-500 uppercase mr-1">Filtrar por Status:</span>
+        <button onclick="setAlunoStatusFilter('ativo')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${currentAlunoStatusFilter === 'ativo' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+          <i class="fas fa-user-check mr-1"></i> Ativos
+        </button>
+        <button onclick="setAlunoStatusFilter('transferido')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${currentAlunoStatusFilter === 'transferido' ? 'bg-amber-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+          <i class="fas fa-exchange-alt mr-1"></i> Transferidos
+        </button>
+        <button onclick="setAlunoStatusFilter('desistente')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${currentAlunoStatusFilter === 'desistente' ? 'bg-rose-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+          <i class="fas fa-user-times mr-1"></i> Desistentes
+        </button>
+        <button onclick="setAlunoStatusFilter('todos')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${currentAlunoStatusFilter === 'todos' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+          <i class="fas fa-users mr-1"></i> Todos
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="abrirModalAdicionarAluno()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition">
+          <i class="fas fa-plus"></i> Matricular Aluno
+        </button>
+      </div>
+    </div>
+  `;
+
   if (alunos.length === 0) {
-    html = `<p class="text-center text-gray-500">Nenhum aluno encontrado para a turma ${turmaNome} e turno ${turno}. Verifique se há alunos registrados no servidor.</p>`;
+    html += `
+      <div class="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center my-4">
+        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-lg">
+          <i class="fas fa-user-graduate"></i>
+        </div>
+        <h4 class="text-base font-bold text-gray-800">Nenhum aluno com status "${currentAlunoStatusFilter}"</h4>
+        <p class="text-xs text-gray-500 mt-1 mb-4">Você pode matricular novos alunos ou alterar o filtro de status acima.</p>
+        <button onclick="abrirModalAdicionarAluno()" class="bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+          <i class="fas fa-plus mr-1"></i> Matricular Aluno
+        </button>
+      </div>
+    `;
   } else {
-    html = '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">';
+    html += '<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">';
     alunos.forEach(aluno => {
+      const statusMat = aluno.status_matricula || 'ativo';
+      let statusBadge = '<span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full"><i class="fas fa-check-circle mr-0.5"></i> Ativo</span>';
+      if (statusMat === 'transferido') {
+        statusBadge = '<span class="bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full"><i class="fas fa-exchange-alt mr-0.5"></i> Transferido</span>';
+      } else if (statusMat === 'desistente') {
+        statusBadge = '<span class="bg-rose-100 text-rose-800 text-[11px] font-bold px-2 py-0.5 rounded-full"><i class="fas fa-times-circle mr-0.5"></i> Desistente</span>';
+      }
+
       html += `
-        <article class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm" style="box-sizing: border-box;">
-          <h3 class="text-lg font-bold text-gray-900 mb-2">${aluno.nome || 'Sem nome'}</h3>
-          <span class="bg-blue-100 text-blue-600 text-xs font-medium px-2 py-0.5 rounded-full mb-2 inline-block">${aluno.turma || 'Sem turma'}</span>
-          <p class="text-gray-600 text-sm mb-4">Matrícula: ${aluno.matricula || 'Sem matrícula'}</p>
-          <div class="flex gap-1 flex-wrap">
-            <button class="flex-1 min-w-[70px] bg-blue-100 text-blue-600 text-xs font-medium py-1 px-1 rounded hover:bg-blue-200 transition" onclick="switchTab('notas', '${aluno.nome}', '${aluno.turma}', '${turno}')">Notas</button>
-            <button class="flex-1 min-w-[70px] bg-red-100 text-red-600 text-xs font-medium py-1 px-1 rounded hover:bg-red-200 transition" onclick="switchTab('advertencias_faltas', '${aluno.nome}', '${aluno.turma}', '${turno}')">Advertências</button>
-            <button class="flex-1 min-w-[70px] bg-yellow-100 text-yellow-700 text-xs font-medium py-1 px-1 rounded hover:bg-yellow-200 transition" onclick="switchTab('notificacoes', '${aluno.nome}', '${aluno.turma}', '${turno}')">Notificações</button>
-            <button class="flex-1 min-w-[70px] bg-purple-100 text-purple-700 text-xs font-medium py-1 px-1 rounded hover:bg-purple-200 transition" onclick="switchTab('fichas_individuais', '${aluno.nome}', '${aluno.turma}', '${turno}')">Ficha</button>
-            <button class="flex-1 min-w-[70px] bg-green-100 text-green-600 text-xs font-medium py-1 px-1 rounded hover:bg-green-200 transition" onclick="switchTab('boletim', '${aluno.nome}', '${aluno.turma}', '${turno}')">Boletim</button>
+        <article class="bg-white rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow transition flex flex-col justify-between" style="box-sizing: border-box;">
+          <div>
+            <div class="flex items-center justify-between gap-1 mb-2">
+              ${statusBadge}
+              <span class="text-[11px] text-gray-500 font-medium">Matrícula: ${aluno.matricula || 'S/N'}</span>
+            </div>
+            
+            <h3 class="text-base font-bold text-gray-900 leading-snug mb-1">${aluno.nome || 'Sem nome'}</h3>
+            <p class="text-xs text-gray-500 mb-3">${aluno.email || aluno.celular || 'Sem contato adicional'}</p>
+          </div>
+
+          <div>
+            <!-- Ações pedagógicas -->
+            <div class="grid grid-cols-3 gap-1 mb-2">
+              <button class="bg-blue-50 text-blue-700 font-semibold text-[11px] py-1.5 px-1 rounded-md hover:bg-blue-100 transition text-center" onclick="switchTab('notas', '${aluno.nome}', '${aluno.turma}', '${turno}')">
+                Notas
+              </button>
+              <button class="bg-amber-50 text-amber-700 font-semibold text-[11px] py-1.5 px-1 rounded-md hover:bg-amber-100 transition text-center" onclick="switchTab('advertencias_faltas', '${aluno.nome}', '${aluno.turma}', '${turno}')">
+                Advertênc.
+              </button>
+              <button class="bg-purple-50 text-purple-700 font-semibold text-[11px] py-1.5 px-1 rounded-md hover:bg-purple-100 transition text-center" onclick="switchTab('boletim', '${aluno.nome}', '${aluno.turma}', '${turno}')">
+                Boletim
+              </button>
+            </div>
+
+            <!-- Controle de Situação / Status Escolar -->
+            <div class="pt-2 border-t border-gray-100 flex items-center justify-between gap-1 text-[11px]">
+              <span class="text-gray-400 font-medium">Situação:</span>
+              <div class="flex items-center gap-1">
+                ${statusMat === 'ativo' ? `
+                  <button onclick="alterarStatusAluno(${aluno.id}, '${aluno.nome}', 'transferido')" title="Marcar como Transferido (mantém histórico escolar)" class="text-amber-700 hover:bg-amber-50 px-1.5 py-0.5 rounded font-medium transition">
+                    Transferir
+                  </button>
+                  <button onclick="alterarStatusAluno(${aluno.id}, '${aluno.nome}', 'desistente')" title="Marcar como Desistente (mantém histórico escolar)" class="text-rose-700 hover:bg-rose-50 px-1.5 py-0.5 rounded font-medium transition">
+                    Desistente
+                  </button>
+                ` : `
+                  <button onclick="alterarStatusAluno(${aluno.id}, '${aluno.nome}', 'ativo')" title="Reativar matrícula" class="text-emerald-700 hover:bg-emerald-50 px-2 py-0.5 rounded font-bold transition">
+                    <i class="fas fa-undo-alt mr-1"></i> Reativar
+                  </button>
+                `}
+              </div>
+            </div>
           </div>
         </article>
       `;
@@ -1121,6 +1203,146 @@ window.addEventListener('popstate', (event) => {
   switchTab(tab, alunoNome, turmaNomeCard);
 });
 
+function setAlunoStatusFilter(status) {
+  currentAlunoStatusFilter = status;
+  renderAlunos(window.turmaNome);
+}
+
+function abrirModalAdicionarAluno() {
+  const modal = document.getElementById('modal-adicionar-aluno');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function fecharModalAdicionarAluno() {
+  const modal = document.getElementById('modal-adicionar-aluno');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function salvarNovoAluno(e) {
+  e.preventDefault();
+  const nome = document.getElementById('novo-aluno-nome').value.trim();
+  const matricula = document.getElementById('novo-aluno-matricula').value.trim();
+  const telefone = document.getElementById('novo-aluno-telefone').value.trim();
+  const email = document.getElementById('novo-aluno-email').value.trim();
+  const turno = window.turmaTurno;
+  const turmaNome = window.turmaNome;
+
+  try {
+    const res = await fetch('/alunos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: nome,
+        matricula: matricula || null,
+        celular: telefone || null,
+        email: email || null,
+        turma: turmaNome,
+        turno: turno,
+        status_matricula: 'ativo'
+      })
+    });
+
+    if (res.ok) {
+      fecharModalAdicionarAluno();
+      document.getElementById('form-adicionar-aluno').reset();
+      await renderAlunos(turmaNome);
+    } else {
+      const err = await res.json();
+      alert(`Erro ao adicionar aluno: ${err.error}`);
+    }
+  } catch (err) {
+    alert(`Erro de conexão: ${err.message}`);
+  }
+}
+
+async function alterarStatusAluno(alunoId, alunoNome, novoStatus) {
+  const descricoes = {
+    'ativo': 'reativar a matrícula deste aluno',
+    'transferido': 'marcar este aluno como TRANSFERIDO (ele sairá da lista de chamada diária, mas todas as notas e registros passados continuarão preservados)',
+    'desistente': 'marcar este aluno como DESISTENTE (ele sairá da lista de chamada diária, mas todo o histórico continuará salvo)'
+  };
+
+  const confirmMsg = `Deseja realmente ${descricoes[novoStatus] || 'alterar status do aluno'} para "${alunoNome}"?`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const res = await fetch(`/alunos/${alunoId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status_matricula: novoStatus })
+    });
+
+    if (res.ok) {
+      await renderAlunos(window.turmaNome);
+    } else {
+      const err = await res.json();
+      alert(`Erro ao atualizar status: ${err.error}`);
+    }
+  } catch (err) {
+    alert(`Erro: ${err.message}`);
+  }
+}
+
+async function verificarMetadadosTurma() {
+  try {
+    const res = await fetch('/turmas?status=todos');
+    if (!res.ok) return;
+    const turmas = await res.json();
+    const t = turmas.find(item => item.nome === window.turmaNome);
+    if (!t) return;
+
+    currentTurmaId = t.id;
+    const tipoBadge = document.getElementById('turma-tipo-badge');
+    const syncBtn = document.getElementById('btn-sync-classroom-turma');
+
+    if (t.tipo_turma === 'classroom' || t.classroom_course_id) {
+      if (tipoBadge) {
+        tipoBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200';
+        tipoBadge.innerHTML = '<i class="fab fa-google text-emerald-600 mr-1"></i> Google Classroom';
+        tipoBadge.classList.remove('hidden');
+      }
+      if (syncBtn) {
+        syncBtn.classList.remove('hidden');
+        syncBtn.classList.add('flex');
+      }
+    } else {
+      if (tipoBadge) {
+        tipoBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-700 border border-gray-200';
+        tipoBadge.textContent = 'Tradicional';
+        tipoBadge.classList.remove('hidden');
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao verificar metadados da turma:', err);
+  }
+}
+
+async function sincronizarEstaTurma(btn) {
+  if (!currentTurmaId) {
+    alert('Identificador da turma não localizado.');
+    return;
+  }
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Sincronizando...';
+
+  try {
+    const rRoster = await fetch(`/classroom/sync_roster/${currentTurmaId}`, { method: 'POST' });
+    const dRoster = await rRoster.json();
+
+    const rGrades = await fetch(`/classroom/sync_grades/${currentTurmaId}`, { method: 'POST' });
+    const dGrades = await rGrades.json();
+
+    alert(`Classroom Sincronizado com Sucesso!\n• ${dRoster.message || 'Alunos sincronizados'}\n• ${dGrades.message || 'Notas espelhadas'}`);
+    await renderAlunos(window.turmaNome);
+  } catch (e) {
+    alert(`Erro na sincronização: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const tab = urlParams.get('tab') || 'alunos';
@@ -1142,5 +1364,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   console.log('Valores definidos no DOMContentLoaded - window.turmaNome:', window.turmaNome, 'window.turmaTurno:', window.turmaTurno);
+  verificarMetadadosTurma();
   switchTab(tab, alunoNome, turmaNomeCard);
 });
