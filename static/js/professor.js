@@ -78,13 +78,18 @@ async function renderTurmas() {
             <i class="fas fa-clipboard-list text-xs"></i> Acessar Diário de Classe
           </button>
 
-          <!-- Se for Classroom, botão de sincronizar que alimenta dados -->
+          <!-- Se for Classroom, botão de sincronizar; se for Tradicional, opção de vincular -->
           ${isClassroom ? `
-            <button onclick="sincronizarClassroomTurma(${t.id}, this)" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition">
+            <button onclick="sincronizarClassroomTurma(${t.id}, this)" class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition">
               <i class="fab fa-google text-emerald-600"></i>
               <span>Sincronizar com Classroom</span>
             </button>
-          ` : ''}
+          ` : `
+            <button onclick="vincularTurmaDireto('${t.nome}', '${primeiroTurno}')" class="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 font-medium text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition">
+              <i class="fab fa-google text-emerald-600"></i>
+              <span>Vincular ao Classroom</span>
+            </button>
+          `}
         </div>
       </article>
     `;
@@ -97,6 +102,12 @@ function selectTurma(turmaNome, turnoPadrao) {
   const turnoFiltro = document.getElementById('turno-select').value;
   const turno = turnoFiltro || turnoPadrao || 'Manhã';
   window.location.href = `/turma/${encodeURIComponent(turmaNome)}/${encodeURIComponent(turno)}`;
+}
+
+function vincularTurmaDireto(turmaNome, turnoPadrao) {
+  const turnoFiltro = document.getElementById('turno-select').value;
+  const turno = turnoFiltro || turnoPadrao || 'Manhã';
+  window.location.href = `/turma/${encodeURIComponent(turmaNome)}/${encodeURIComponent(turno)}?action=vincular`;
 }
 
 function filterTurmas() {

@@ -1294,26 +1294,162 @@ async function verificarMetadadosTurma() {
     currentTurmaId = t.id;
     const tipoBadge = document.getElementById('turma-tipo-badge');
     const syncBtn = document.getElementById('btn-sync-classroom-turma');
+    const vincularBtn = document.getElementById('btn-vincular-classroom-turma');
+    const opcoesBtn = document.getElementById('btn-opcoes-classroom-turma');
+    const desvincularBtn = document.getElementById('btn-desvincular-turma');
 
-    if (t.tipo_turma === 'classroom' || t.classroom_course_id) {
+    if (t.classroom_course_id) {
       if (tipoBadge) {
         tipoBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200';
-        tipoBadge.innerHTML = '<i class="fab fa-google text-emerald-600 mr-1"></i> Google Classroom';
+        tipoBadge.innerHTML = '<i class="fab fa-google text-emerald-600 mr-1"></i> Classroom (Vinculada)';
         tipoBadge.classList.remove('hidden');
       }
       if (syncBtn) {
         syncBtn.classList.remove('hidden');
         syncBtn.classList.add('flex');
       }
+      if (opcoesBtn) opcoesBtn.classList.remove('hidden');
+      if (vincularBtn) vincularBtn.classList.add('hidden');
+      if (desvincularBtn) desvincularBtn.classList.remove('hidden');
     } else {
       if (tipoBadge) {
         tipoBadge.className = 'text-xs px-2.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-700 border border-gray-200';
         tipoBadge.textContent = 'Tradicional';
         tipoBadge.classList.remove('hidden');
       }
+      if (vincularBtn) {
+        vincularBtn.classList.remove('hidden');
+        vincularBtn.classList.add('flex');
+      }
+      if (syncBtn) syncBtn.classList.add('hidden');
+      if (opcoesBtn) opcoesBtn.classList.add('hidden');
+      if (desvincularBtn) desvincularBtn.classList.add('hidden');
     }
   } catch (err) {
     console.warn('Erro ao verificar metadados da turma:', err);
+  }
+}
+
+// Modal e Vinculação de Sala do Classroom pelo Professor
+async function abrirModalVincularClassroom() {
+  if (!currentTurmaId) {
+    alert('Identificador da turma não localizado.');
+    return;
+  }
+
+  // Verifica se o professor está autenticado no Google
+  const statusRes = await fetch(`/classroom/status?turma_id=${currentTurmaId}`);
+  const statusData = await statusRes.json();
+
+  if (!statusData.connected) {
+    if (confirm('Para vincular esta turma oficial à sua sala do Google Classroom, conecte sua conta Google. Deseja prosseguir para o login?')) {
+      const returnUrl = encodeURIComponent(window.location.pathname + '?action=vincular');
+      window.location.href = `/classroom/auth?turma_id=${currentTurmaId}&return_to=${returnUrl}`;
+    }
+    return;
+  }
+
+  const modal = document.getElementById('modal-vincular-classroom');
+  if (modal) modal.classList.remove('hidden');
+
+  carregarSalasDoProfessor();
+}
+
+function fecharModalVincularClassroom() {
+  const modal = document.getElementById('modal-vincular-classroom');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function carregarSalasDoProfessor() {
+  const listaEl = document.getElementById('lista-salas-vincular');
+  listaEl.innerHTML = '<p class="text-xs text-gray-400 py-4 text-center"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando suas salas do Google Classroom...</p>';
+
+  try {
+    const res = await fetch(`/classroom/courses?turma_id=${currentTurmaId}`);
+    if (!res.ok) {
+      const err = await res.json();
+      listaEl.innerHTML = `<p class="text-xs text-red-500 py-3 text-center">${err.error || 'Não foi possível carregar turmas'}</p>`;
+      return;
+    }
+
+    const courses = await res.json();
+    if (!courses || courses.length === 0) {
+      listaEl.innerHTML = '<p class="text-xs text-gray-500 py-4 text-center">Nenhuma turma encontrada na sua conta Google Classroom.</p>';
+      return;
+    }
+
+    let html = '';
+    courses.forEach(c => {
+      html += `
+        <div class="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition">
+          <div class="pr-2">
+            <h5 class="text-xs font-bold text-gray-900">${c.nome}</h5>
+            <p class="text-[11px] text-gray-500">${c.secao || 'Sem seção'} • ID: ${c.id}</p>
+          </div>
+          <button onclick="vincularCursoTurma('${c.id}', this)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
+            <i class="fas fa-link"></i> Vincular a esta Turma
+          </button>
+        </div>
+      `;
+    });
+    listaEl.innerHTML = html;
+  } catch (err) {
+    listaEl.innerHTML = `<p class="text-xs text-red-500 py-3 text-center">Erro: ${err.message}</p>`;
+  }
+}
+
+async function vincularCursoTurma(courseId, btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vinculando...';
+
+  try {
+    const res = await fetch('/classroom/link_course', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        turma_id: currentTurmaId,
+        course_id: courseId
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      alert(`✅ ${data.message || 'Turma vinculada e sincronizada com sucesso!'}`);
+      fecharModalVincularClassroom();
+      await verificarMetadadosTurma();
+      await renderAlunos(window.turmaNome);
+    } else {
+      alert(`Erro: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Erro ao vincular: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+async function desvincularTurma() {
+  if (!confirm('Deseja realmente desvincular o Google Classroom desta turma? Todas as notas, presenças e histórico continuarão salvos no CDiario.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/classroom/unlink_course/${currentTurmaId}`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert(data.message || 'Turma desvinculada.');
+      fecharModalVincularClassroom();
+      await verificarMetadadosTurma();
+      await renderAlunos(window.turmaNome);
+    } else {
+      alert(`Erro: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Erro: ${e.message}`);
   }
 }
 
@@ -1380,6 +1516,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   console.log('Valores definidos no DOMContentLoaded - window.turmaNome:', window.turmaNome, 'window.turmaTurno:', window.turmaTurno);
-  verificarMetadadosTurma();
+  verificarMetadadosTurma().then(() => {
+    if (urlParams.get('action') === 'vincular') {
+      abrirModalVincularClassroom();
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  });
   switchTab(tab, alunoNome, turmaNomeCard);
 });

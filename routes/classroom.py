@@ -219,15 +219,30 @@ def oauth2callback():
 
         logger.info("Conta Google Classroom conectada com sucesso!")
 
-        # Se veio de uma turma, já roda a sincronização inicial imediatamente!
+        # Se veio de uma turma e já tinha course_id, já sincroniza
+        sync_ok = False
+        turma_has_course = False
         if turma_id:
             try:
-                sync_internal(int(turma_id), creds)
+                conn_chk = get_db_connection()
+                cur_chk = conn_chk.cursor()
+                cur_chk.execute("SELECT classroom_course_id FROM turmas WHERE id = ?", (turma_id,))
+                t_row = cur_chk.fetchone()
+                conn_chk.close()
+                if t_row and t_row['classroom_course_id']:
+                    turma_has_course = True
+                    sync_internal(int(turma_id), creds)
+                    sync_ok = True
             except Exception as e:
                 logger.warning(f"Sincronização imediata pós-auth: {e}")
 
         target = return_to or '/professor'
         separator = '&' if '?' in target else '?'
+
+        if turma_id and not turma_has_course:
+            # Redireciona de volta para abrir o modal de escolha da sala do professor!
+            return redirect(f"{target}{separator}classroom=connected&action=vincular&turma_id={turma_id}")
+
         return redirect(f"{target}{separator}classroom=success")
 
     except Exception as e:
@@ -238,10 +253,11 @@ def oauth2callback():
 
 @classroom_bp.route('/courses', methods=['GET'])
 def get_courses():
-    """Lista as turmas do Google Classroom para a Coordenação importar."""
-    creds = get_turma_creds()
+    """Lista as turmas do Google Classroom da conta conectada."""
+    turma_id = request.args.get('turma_id', type=int)
+    creds = get_turma_creds(turma_id)
     if not creds:
-        return jsonify({'error': 'Não autenticado no Google Classroom. A Gestão precisa conectar a conta Google primeiro.'}), 401
+        return jsonify({'error': 'Não autenticado no Google Classroom. Faça login com sua conta Google primeiro.'}), 401
 
     try:
         courses = list_teacher_courses(creds)
@@ -255,6 +271,75 @@ def get_courses():
         return jsonify(formatted), 200
     except Exception as e:
         logger.error(f"Erro ao listar turmas do Classroom: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@classroom_bp.route('/link_course', methods=['POST'])
+def link_course():
+    """Vincula uma turma oficial existente à sala do Google Classroom do professor."""
+    data = request.get_json() or {}
+    turma_id = data.get('turma_id')
+    course_id = data.get('course_id')
+
+    if not turma_id or not course_id:
+        return jsonify({'error': 'turma_id e course_id são obrigatórios'}), 400
+
+    creds = get_turma_creds(turma_id)
+    if not creds:
+        return jsonify({
+            'error': 'Não autenticado no Google Classroom',
+            'requires_auth': True,
+            'auth_url': f'/classroom/auth?turma_id={turma_id}'
+        }), 401
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM turmas WHERE id = ?", (turma_id,))
+        turma = cur.fetchone()
+        if not turma:
+            conn.close()
+            return jsonify({'error': 'Turma não encontrada no banco'}), 404
+
+        token_str = None
+        if session.get('google_token'):
+            token_str = json.dumps(session['google_token'])
+
+        cur.execute('''
+            UPDATE turmas
+            SET classroom_course_id = ?, tipo_turma = 'classroom',
+                google_token = COALESCE(?, google_token)
+            WHERE id = ?
+        ''', (course_id, token_str, turma_id))
+        conn.commit()
+        conn.close()
+
+        # Executa a sincronização inicial imediata dos alunos e notas da sala vinculada
+        resultado = sync_internal(int(turma_id), creds)
+
+        return jsonify({
+            'success': True,
+            'message': f"Turma vinculada com sucesso! {resultado['total_alunos']} alunos e {resultado['notas_atualizadas']} notas espelhados.",
+            'resultado': resultado
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Erro ao vincular sala à turma: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@classroom_bp.route('/unlink_course/<int:turma_id>', methods=['POST'])
+def unlink_course(turma_id):
+    """Desvincula a turma do Classroom preservando todos os dados no CDiario."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE turmas SET classroom_course_id = NULL, tipo_turma = 'tradicional' WHERE id = ?", (turma_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({
+            'success': True,
+            'message': 'Turma desvinculada do Classroom. O diário continua funcionando normalmente em modo tradicional.'
+        }), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @classroom_bp.route('/import_course', methods=['POST'])
