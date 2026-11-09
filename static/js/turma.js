@@ -1327,14 +1327,30 @@ async function sincronizarEstaTurma(btn) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Sincronizando...';
 
   try {
-    const rRoster = await fetch(`/classroom/sync_roster/${currentTurmaId}`, { method: 'POST' });
-    const dRoster = await rRoster.json();
+    const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+    const res = await fetch(`/classroom/sync/${currentTurmaId}?return_to=${returnUrl}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
 
-    const rGrades = await fetch(`/classroom/sync_grades/${currentTurmaId}`, { method: 'POST' });
-    const dGrades = await rGrades.json();
+    const data = await res.json();
 
-    alert(`Classroom Sincronizado com Sucesso!\n• ${dRoster.message || 'Alunos sincronizados'}\n• ${dGrades.message || 'Notas espelhadas'}`);
-    await renderAlunos(window.turmaNome);
+    if (data.requires_auth) {
+      if (confirm('Para sincronizar os dados desta turma com o Classroom, é necessário conectar sua conta Google uma única vez. Deseja prosseguir?')) {
+        window.location.href = data.auth_url;
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+      return;
+    }
+
+    if (data.success) {
+      alert(`✅ ${data.message}`);
+      await renderAlunos(window.turmaNome);
+    } else {
+      alert(`Aviso: ${data.error || 'Não foi possível sincronizar'}`);
+    }
   } catch (e) {
     alert(`Erro na sincronização: ${e.message}`);
   } finally {

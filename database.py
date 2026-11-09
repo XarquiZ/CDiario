@@ -229,7 +229,9 @@ def init_postgres_db():
                 status TEXT DEFAULT 'ativa',
                 tipo_turma TEXT DEFAULT 'tradicional',
                 professor_usuario TEXT,
-                classroom_course_id TEXT
+                classroom_course_id TEXT,
+                google_token TEXT,
+                google_email TEXT
             );
         ''')
 
@@ -338,10 +340,13 @@ def init_postgres_db():
             "ALTER TABLE turmas ADD COLUMN IF NOT EXISTS tipo_turma TEXT DEFAULT 'tradicional';",
             "ALTER TABLE turmas ADD COLUMN IF NOT EXISTS professor_usuario TEXT;",
             "ALTER TABLE turmas ADD COLUMN IF NOT EXISTS classroom_course_id TEXT;",
+            "ALTER TABLE turmas ADD COLUMN IF NOT EXISTS google_token TEXT;",
+            "ALTER TABLE turmas ADD COLUMN IF NOT EXISTS google_email TEXT;",
             "ALTER TABLE alunos ADD COLUMN IF NOT EXISTS status_matricula TEXT DEFAULT 'ativo';",
             "ALTER TABLE alunos ADD COLUMN IF NOT EXISTS classroom_user_id TEXT;",
             "ALTER TABLE notas ADD COLUMN IF NOT EXISTS classroom_work_id TEXT;",
-            "ALTER TABLE notas ADD COLUMN IF NOT EXISTS classroom_submission_id TEXT;"
+            "ALTER TABLE notas ADD COLUMN IF NOT EXISTS classroom_submission_id TEXT;",
+            "CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY, valor TEXT);"
         ]
         for stmt in migration_statements:
             try:

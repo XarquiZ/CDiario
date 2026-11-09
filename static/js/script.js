@@ -737,11 +737,19 @@ async function renderTurmas() {
     html += '<p class="text-center text-gray-500">Nenhuma turma cadastrada.</p>';
   } else {
     turmas.forEach((turma, index) => {
+      const isClassroom = turma.tipo_turma === 'classroom' || !!turma.classroom_course_id;
       html += `
         <article class="turma-card" data-index="${index}" data-id="${turma.id}">
           <div>
-            <h3 class="font-extrabold text-lg text-[#0F172A] mb-2 select-none">${turma.nome}</h3>
-            <p class="text-sm text-[#64748B] select-none">Turnos: ${turma.turnos.length > 0 ? turma.turnos.join(', ') : 'Nenhum turno definido'}</p>
+            <div class="flex items-center justify-between mb-2">
+              <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${isClassroom ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">
+                <i class="${isClassroom ? 'fab fa-google' : 'fas fa-book'} text-[10px]"></i>
+                ${isClassroom ? 'Classroom' : 'Tradicional'}
+              </span>
+              <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">${turma.ano_semestre || '2026.1'}</span>
+            </div>
+            <h3 class="font-extrabold text-lg text-[#0F172A] mb-1 select-none">${turma.nome}</h3>
+            <p class="text-xs text-[#64748B] select-none">Turnos: ${turma.turnos.length > 0 ? turma.turnos.join(', ') : 'Nenhum turno definido'}</p>
           </div>
           <div class="flex justify-between items-center mt-6">
             <button type="button" class="editar-btn" onclick="openEditModal(${index})">
@@ -749,7 +757,7 @@ async function renderTurmas() {
               Editar
             </button>
             <button type="button" class="excluir-btn" onclick="deleteTurma(${index})">
-              <i class="fas fa-folder text-base"></i>
+              <i class="fas fa-trash-alt text-base"></i>
               Excluir
             </button>
           </div>
@@ -912,10 +920,14 @@ async function switchTab(tab) {
     document.querySelector('[onclick="switchTab(\'turmas\')"]').classList.add('active');
     title.textContent = 'GERENCIAMENTO DE TURMAS';
     controlsContainer.innerHTML = `
-      <div class="filters-section">
+      <div class="filters-section flex items-center gap-3">
         <button class="nova-turma-btn" onclick="openModal('create')">
           <i class="fas fa-folder"></i>
           Nova Turma
+        </button>
+        <button type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2" onclick="openClassroomModal()">
+          <i class="fab fa-google"></i>
+          Importar do Classroom
         </button>
       </div>
     `;
@@ -1125,3 +1137,167 @@ document.addEventListener('DOMContentLoaded', function() {
   // Carrega a aba "Gerenciar Turmas" ao iniciar a página
   switchTab('turmas');
 });
+
+// Funções do Modal Google Classroom para Gestão
+async function openClassroomModal() {
+  const modal = document.getElementById('modal-classroom-gestao');
+  if (modal) modal.classList.remove('hidden');
+
+  switchClassroomModalTab('importar');
+  await carregarCursosClassroomGestao();
+  await carregarConfigGoogle();
+}
+
+function closeClassroomModal() {
+  const modal = document.getElementById('modal-classroom-gestao');
+  if (modal) modal.classList.add('hidden');
+}
+
+function switchClassroomModalTab(tab) {
+  const tabImportar = document.getElementById('tab-importar-turmas');
+  const tabConfig = document.getElementById('tab-config-oauth');
+  const secImportar = document.getElementById('classroom-tab-importar');
+  const secConfig = document.getElementById('classroom-tab-config');
+
+  if (tab === 'importar') {
+    tabImportar.className = 'pb-2 border-b-2 border-emerald-600 text-emerald-700 font-bold';
+    tabConfig.className = 'pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-800 font-medium';
+    secImportar.classList.remove('hidden');
+    secConfig.classList.add('hidden');
+  } else {
+    tabConfig.className = 'pb-2 border-b-2 border-emerald-600 text-emerald-700 font-bold';
+    tabImportar.className = 'pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-800 font-medium';
+    secConfig.classList.remove('hidden');
+    secImportar.classList.add('hidden');
+  }
+}
+
+async function carregarCursosClassroomGestao() {
+  const descEl = document.getElementById('classroom-gestao-desconectado');
+  const conEl = document.getElementById('classroom-gestao-conectado');
+  const emailEl = document.getElementById('gestao-classroom-email');
+  const listEl = document.getElementById('gestao-classroom-courses-list');
+
+  try {
+    const statusRes = await fetch('/classroom/status');
+    const statusData = await statusRes.json();
+
+    if (!statusData.connected) {
+      descEl.classList.remove('hidden');
+      conEl.classList.add('hidden');
+      return;
+    }
+
+    descEl.classList.add('hidden');
+    conEl.classList.remove('hidden');
+    emailEl.textContent = statusData.email || 'Conta Google Conectada';
+
+    listEl.innerHTML = '<p class="text-xs text-gray-400 py-3 text-center"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando turmas do Google...</p>';
+
+    const res = await fetch('/classroom/courses');
+    if (!res.ok) {
+      const err = await res.json();
+      listEl.innerHTML = `<p class="text-xs text-red-500 py-2 text-center">${err.error || 'Não foi possível carregar turmas'}</p>`;
+      return;
+    }
+
+    const courses = await res.json();
+    if (!courses || courses.length === 0) {
+      listEl.innerHTML = '<p class="text-xs text-gray-500 py-4 text-center">Nenhuma turma encontrada nesta conta Google.</p>';
+      return;
+    }
+
+    let html = '';
+    courses.forEach(c => {
+      html += `
+        <div class="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition">
+          <div class="pr-2">
+            <h5 class="text-xs font-bold text-gray-900">${c.nome}</h5>
+            <p class="text-[11px] text-gray-500">${c.secao || 'Sem seção'} • ID: ${c.id}</p>
+          </div>
+          <button onclick="importarTurmaClassroomGestao('${c.id}', this)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
+            <i class="fas fa-download"></i> Importar
+          </button>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  } catch (err) {
+    listEl.innerHTML = `<p class="text-xs text-red-500 py-2 text-center">Erro: ${err.message}</p>`;
+  }
+}
+
+async function importarTurmaClassroomGestao(courseId, btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+
+  try {
+    const res = await fetch('/classroom/import_course', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        course_id: courseId,
+        turnos: ['Manhã'],
+        ano_semestre: '2026.1'
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      alert(`✅ Sucesso! Turma '${data.turma_nome}' importada para o CDiario com ${data.total_alunos} alunos!`);
+      closeClassroomModal();
+      switchTab('turmas');
+    } else {
+      alert(`Erro ao importar: ${data.error}`);
+    }
+  } catch (err) {
+    alert(`Erro de conexão: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+async function carregarConfigGoogle() {
+  try {
+    const res = await fetch('/classroom/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.client_id) {
+        const input = document.getElementById('config-google-client-id');
+        if (input) input.value = data.client_id;
+      }
+    }
+  } catch (e) {
+    console.debug('Erro ao carregar config google:', e);
+  }
+}
+
+async function salvarConfigGoogle() {
+  const clientId = document.getElementById('config-google-client-id').value.trim();
+  const clientSecret = document.getElementById('config-google-client-secret').value.trim();
+
+  if (!clientId || !clientSecret) {
+    alert('Por favor, informe tanto o Client ID quanto o Client Secret.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/classroom/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('✅ Credenciais do Google Cloud salvas no banco com sucesso!');
+      switchClassroomModalTab('importar');
+      await carregarCursosClassroomGestao();
+    } else {
+      alert(`Erro: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Erro ao salvar: ${e.message}`);
+  }
+}

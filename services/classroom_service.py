@@ -19,14 +19,32 @@ SCOPES = [
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials.json')
 
 def get_client_config():
-    """Lê a configuração do cliente OAuth de credentials.json ou de variáveis de ambiente."""
+    """Lê a configuração do cliente OAuth de credentials.json, variáveis de ambiente ou tabela de configurações."""
     if os.path.exists(CLIENT_SECRETS_FILE):
-        with open(CLIENT_SECRETS_FILE, 'r') as f:
-            return json.load(f)
-    
+        try:
+            with open(CLIENT_SECRETS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Erro ao ler credentials.json: {e}")
+
     # Suporte a configuração via variáveis de ambiente
     client_id = os.environ.get('GOOGLE_CLIENT_ID')
     client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+
+    # Fallback para banco de dados (tabela configuracoes)
+    if not (client_id and client_secret):
+        try:
+            from database import get_db_connection
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT chave, valor FROM configuracoes WHERE chave IN ('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET')")
+            rows = {row['chave']: row['valor'] for row in cur.fetchall()}
+            conn.close()
+            client_id = client_id or rows.get('GOOGLE_CLIENT_ID')
+            client_secret = client_secret or rows.get('GOOGLE_CLIENT_SECRET')
+        except Exception as e:
+            logger.debug(f"Erro ao buscar configuracoes: {e}")
+
     if client_id and client_secret:
         return {
             "web": {
@@ -34,7 +52,7 @@ def get_client_config():
                 "client_secret": client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/classroom/oauth2callback')]
+                "redirect_uris": [os.environ.get('GOOGLE_REDIRECT_URI', 'https://cdiario.onrender.com/classroom/oauth2callback')]
             }
         }
     return None
@@ -43,7 +61,7 @@ def create_flow(redirect_uri):
     """Cria o fluxo de autorização OAuth."""
     config = get_client_config()
     if not config:
-        raise ValueError("Credenciais do Google não configuradas. Adicione 'credentials.json' ou GOOGLE_CLIENT_ID/SECRET no .env.")
+        raise ValueError("Credenciais do Google não configuradas. A Coordenação precisa informar o Client ID e Client Secret nas configurações.")
 
     flow = Flow.from_client_config(
         config,
@@ -53,7 +71,7 @@ def create_flow(redirect_uri):
     return flow
 
 def credentials_from_token_dict(token_dict):
-    """Reconstitui Credentials do Google a partir do dicionário ou JSON salvo."""
+    """Reconstitui Credentials do Google a partir do dicionário ou JSON salvo, renovando automaticamente se expirado."""
     if isinstance(token_dict, str):
         token_dict = json.loads(token_dict)
 
@@ -66,13 +84,16 @@ def credentials_from_token_dict(token_dict):
         scopes=token_dict.get('scopes', SCOPES)
     )
 
+    was_refreshed = False
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
+            was_refreshed = True
+            logger.info("Token do Google renovado com sucesso via refresh_token.")
         except Exception as e:
             logger.error(f"Erro ao renovar token do Google: {e}")
 
-    return creds
+    return creds, was_refreshed
 
 def get_classroom_service(creds):
     """Retorna o client da Classroom API v1."""

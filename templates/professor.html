@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-[#F8FAFF] min-h-screen font-['Inter']">
-  <!-- Header -->
+  <!-- Header do Professor -->
   <header class="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white sticky top-0 z-30 shadow-sm">
     <div class="flex items-center gap-4">
       <button class="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition font-medium text-sm" onclick="window.location.href='/'">
@@ -18,42 +18,27 @@
         <span>Início</span>
       </button>
       <div class="h-5 w-px bg-gray-300"></div>
-      <h1 class="font-extrabold text-[#2563EB] text-lg select-none">CDiario • Painel de Turmas</h1>
+      <h1 class="font-extrabold text-[#2563EB] text-lg select-none">CDiario • Diário de Classe</h1>
     </div>
     
-    <!-- Status do Google Classroom e Logo -->
-    <div class="flex items-center gap-4">
-      <div id="classroom-badge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border bg-gray-50 text-gray-600">
-        <i class="fab fa-google text-red-500"></i>
-        <span id="classroom-badge-text">Verificando Classroom...</span>
-      </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-500 font-medium hidden sm:inline">Ambiente do Professor</span>
       <img src="/static/logo.png" alt="Logo CEDESP" class="h-9 object-contain">
     </div>
   </header>
 
-  <!-- Mensagem de Alerta (Classroom OAuth Feedback) -->
+  <!-- Banner de Feedback (ex: Retorno da autorização do Google) -->
   <div id="alert-banner" class="hidden max-w-6xl mx-auto mt-4 px-4"></div>
 
-  <!-- Barra Superior: Boas-vindas e Ações Rápidas -->
+  <!-- Barra Superior: Boas-vindas -->
   <div class="max-w-6xl mx-auto px-4 pt-6 pb-2">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-gray-200">
-      <div>
-        <h2 class="text-2xl font-bold text-gray-900">Gerenciamento de Turmas</h2>
-        <p class="text-gray-500 text-sm mt-0.5">Selecione uma turma para registrar chamadas, lançar notas ou gerenciar alunos.</p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <button onclick="openModalNovaTurma()" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition">
-          <i class="fas fa-plus"></i> Nova Turma Manual
-        </button>
-        <button onclick="openModalClassroom()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition">
-          <i class="fab fa-google"></i> Importar do Classroom
-        </button>
-      </div>
+    <div class="pb-3 border-b border-gray-200">
+      <h2 class="text-2xl font-bold text-gray-900">Minhas Turmas</h2>
+      <p class="text-gray-500 text-sm mt-0.5">Selecione uma turma para realizar chamada, lançar notas ou consultar fichas dos alunos.</p>
     </div>
   </div>
 
-  <!-- Barra de Filtros e Visualização -->
+  <!-- Barra de Filtros (Turno, Semestre, Ativas/Arquivadas) -->
   <div class="max-w-6xl mx-auto px-4 py-4">
     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -93,134 +78,13 @@
     </div>
   </div>
 
-  <!-- Grid de Turmas -->
+  <!-- Grid de Turmas do Professor -->
   <main class="max-w-6xl mx-auto px-4 pb-16">
     <div id="turmas-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <!-- Turmas renderizadas pelo JavaScript -->
     </div>
   </main>
 
-  <!-- MODAL: NOVA TURMA MANUAL -->
-  <div id="modal-nova-turma" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
-        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <i class="fas fa-chalkboard-teacher text-blue-600"></i> Nova Turma Tradicional
-        </h3>
-        <button onclick="closeModalNovaTurma()" class="text-gray-400 hover:text-gray-600 text-lg">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <form id="form-nova-turma" onsubmit="salvarNovaTurma(event)" class="mt-4 space-y-4">
-        <div>
-          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nome da Turma</label>
-          <input type="text" id="nova-turma-nome" required placeholder="Ex: Informática Básica" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Ano / Semestre</label>
-            <input type="text" id="nova-turma-semestre" value="2026.1" required placeholder="Ex: 2026.1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Turno Principal</label>
-            <select id="nova-turma-turno" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-              <option value="Manhã">Manhã</option>
-              <option value="Tarde">Tarde</option>
-              <option value="Noite">Noite</option>
-            </select>
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-          <button type="button" onclick="closeModalNovaTurma()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-          <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">Criar Turma</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: GOOGLE CLASSROOM (IMPORTAÇÃO E CONEXÃO) -->
-  <div id="modal-classroom" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
-        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <i class="fab fa-google text-emerald-600"></i> Google Classroom
-        </h3>
-        <button onclick="closeModalClassroom()" class="text-gray-400 hover:text-gray-600 text-lg">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-
-      <!-- Estado: Não Conectado -->
-      <div id="classroom-desconectado" class="mt-4 text-center py-6 hidden">
-        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl mb-3">
-          <i class="fab fa-google"></i>
-        </div>
-        <h4 class="text-base font-bold text-gray-800">Conecte sua conta do Google</h4>
-        <p class="text-sm text-gray-500 max-w-xs mx-auto mt-1 mb-5">
-          Conecte sua conta Gmail para importar turmas, sincronizar alunos e espelhar notas de atividades automaticamente.
-        </p>
-        <a href="/classroom/auth" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-6 py-2.5 rounded-lg shadow-sm transition">
-          <i class="fab fa-google"></i> Conectar com Google
-        </a>
-      </div>
-
-      <!-- Estado: Conectado (Lista de Cursos do Classroom) -->
-      <div id="classroom-conectado" class="mt-4 hidden">
-        <div class="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
-          <div class="flex items-center gap-2 text-xs text-emerald-800 font-medium">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span>Conectado: <strong id="classroom-user-email">email@gmail.com</strong></span>
-          </div>
-          <a href="/classroom/auth" class="text-xs text-emerald-700 underline hover:text-emerald-900">Trocar conta</a>
-        </div>
-
-        <h4 class="text-xs font-bold text-gray-700 uppercase mb-2">Suas turmas no Google Classroom</h4>
-        <div id="classroom-courses-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
-          <!-- Renderizado via JS -->
-        </div>
-
-        <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-          <button onclick="closeModalClassroom()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: DUPLICAR TURMA PARA NOVO SEMESTRE -->
-  <div id="modal-duplicar" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
-        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <i class="fas fa-copy text-purple-600"></i> Duplicar Turma
-        </h3>
-        <button onclick="closeModalDuplicar()" class="text-gray-400 hover:text-gray-600 text-lg">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <form id="form-duplicar-turma" onsubmit="executarDuplicacao(event)" class="mt-4 space-y-4">
-        <input type="hidden" id="duplicar-turma-id">
-        <p class="text-sm text-gray-600">
-          Você está duplicando a turma <strong id="duplicar-turma-nome" class="text-gray-900"></strong> para um novo semestre.
-        </p>
-        <div>
-          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Novo Ano / Semestre</label>
-          <input type="text" id="duplicar-semestre" required value="2026.2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none">
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="checkbox" id="duplicar-copiar-alunos" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
-          <label for="duplicar-copiar-alunos" class="text-sm text-gray-700">Copiar lista de alunos ativos para a nova turma</label>
-        </div>
-        <p class="text-xs text-gray-400 italic">
-          * As notas e presenças do semestre anterior não serão apagadas nem misturadas. A nova turma inicia o diário limpo.
-        </p>
-        <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-          <button type="button" onclick="closeModalDuplicar()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-          <button type="submit" class="px-5 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm">Duplicar Turma</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script src="/static/js/professor.js?v=5"></script>
+  <script src="/static/js/professor.js?v=6"></script>
 </body>
 </html>
