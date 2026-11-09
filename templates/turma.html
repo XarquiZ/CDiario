@@ -91,11 +91,11 @@
 
   <div class="w-full mx-auto mt-6 main-container">
     <nav class="flex border border-gray-200 rounded-xl overflow-hidden text-center text-sm font-medium text-gray-700 mb-6 bg-white shadow-sm w-full" role="tablist" aria-label="Navegação do painel">
-      <button class="nav-tab flex-1 py-3 border-r border-gray-200 bg-white text-blue-600 font-bold" role="tab" aria-selected="true" tabindex="0" type="button" onclick="switchTab('alunos')">
-        <i class="fas fa-users mr-1.5"></i> Alunos
-      </button>
-      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('chamada')">
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200 bg-white text-blue-600 font-bold" role="tab" aria-selected="true" tabindex="0" type="button" onclick="switchTab('chamada')">
         <i class="fas fa-clipboard-check mr-1.5"></i> Chamada
+      </button>
+      <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('alunos')">
+        <i class="fas fa-users mr-1.5"></i> Alunos
       </button>
       <button class="nav-tab flex-1 py-3 border-r border-gray-200" role="tab" aria-selected="false" tabindex="-1" type="button" onclick="switchTab('notas')">
         <i class="fas fa-star mr-1.5"></i> Notas
@@ -201,7 +201,7 @@
     window.turmaTurno = "{{ turno }}";
   </script>
 
-  <script src="{{ url_for('static', filename='js/turma.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/turma.js') }}?v=8"></script>
   <script src="{{ url_for('static', filename='js/advertencias.js') }}?v=4"></script>
   <script src="{{ url_for('static', filename='js/advertencias_faltas.js') }}?v=2"></script>
   <script src="{{ url_for('static', filename='js/fichas_individuais.js') }}?v=1"></script>

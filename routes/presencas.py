@@ -376,7 +376,7 @@ def get_faltas():
         cursor.execute('''
             SELECT count(*) as total_faltas
             FROM presencas
-            WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND falta = 1
+            WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND falta IS TRUE
         ''', (aluno, turma, turno_normalized))
         
         row = cursor.fetchone()
@@ -405,7 +405,7 @@ def get_faltas_detalhes():
         cursor.execute('''
             SELECT id, data, presente, falta, justificado
             FROM presencas
-            WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND falta = 1
+            WHERE aluno_nome = ? AND turma = ? AND lower(turno) = ? AND falta IS TRUE
             ORDER BY data ASC
         ''', (aluno, turma, turno_normalized))
         faltas = cursor.fetchall()

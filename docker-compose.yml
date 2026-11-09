@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL Local no TrueNAS (offline & ultra-rápido)
+  db:
+    image: postgres:16-alpine
+    container_name: cdiario-db
+    restart: always
+    environment:
+      POSTGRES_DB: cdiario
+      POSTGRES_USER: cdiario_user
+      POSTGRES_PASSWORD: cdiario_secret_password_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cdiario_user -d cdiario"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Aplicação CDiario
+  web:
+    build: .
+    container_name: cdiario-app
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - SECRET_KEY=cdiario-chave-super-segura-truenas-2026
+      # Conecta ao Postgres local do próprio TrueNAS
+      - DATABASE_URL=postgresql://cdiario_user:cdiario_secret_password_2026@db:5432/cdiario
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:

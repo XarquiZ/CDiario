@@ -1517,7 +1517,7 @@ async function sincronizarEstaTurma(btn) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const tab = urlParams.get('tab') || 'alunos';
+  const tab = urlParams.get('tab') || 'chamada';
   const alunoNome = urlParams.get('aluno');
   const turmaNomeCard = urlParams.get('turmaCard');
 
