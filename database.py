@@ -84,7 +84,8 @@ class PostgresCursorWrapper:
         has_returning = 'RETURNING' in clean_sql.upper()
 
         auto_returning = False
-        if is_insert and not has_returning:
+        is_configuracoes = 'CONFIGURACOES' in clean_sql.upper()
+        if is_insert and not has_returning and not is_configuracoes:
             clean_sql = f"{clean_sql} RETURNING id"
             auto_returning = True
 
